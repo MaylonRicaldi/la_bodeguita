@@ -7,87 +7,207 @@ class ProductosScreen extends StatefulWidget {
 }
 
 class _ProductosScreenState extends State<ProductosScreen> {
-  final int _limitIncrement = 10;
-  int _limit = 10;
-  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_scrollListener);
+    _searchController.addListener(_onSearchChanged);
   }
 
-  void _scrollListener() {
-    if (_scrollController.position.pixels ==
-        _scrollController.position.maxScrollExtent) {
-      setState(() {
-        _limit += _limitIncrement;
-      });
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.trim().toLowerCase();
+    });
+  }
+
+  String _formatearEnlaceDrive(String? url) {
+    if (url == null || url.isEmpty) return "";
+    final regex = RegExp(r'/d/([^/]+)/');
+    final match = regex.firstMatch(url);
+    if (match != null) {
+      final id = match.group(1);
+      return "https://drive.google.com/uc?export=view&id=$id";
     }
+    return url;
+  }
+
+  Future<void> _onRefresh() async {
+    setState(() {}); 
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('productos')
-          .limit(_limit)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Error al cargar productos'));
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        final productos = snapshot.data!.docs;
-
-        if (productos.isEmpty) {
-          return const Center(child: Text('No hay productos'));
-        }
-
-        return ListView.builder(
-          controller: _scrollController,
-          itemCount: productos.length,
-          itemBuilder: (context, index) {
-            final data = productos[index].data() as Map<String, dynamic>;
-
-            final nombre = data['nombre'] ?? 'Sin nombre';
-            final precio = data['precio'] ?? 0;
-            final imagenUrl = data['imagen']; // 🔥 Aquí traes el enlace de Drive
-
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              elevation: 3,
-              child: ListTile(
-                leading: imagenUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          imagenUrl,
-                          width: 55,
-                          height: 55,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.image_not_supported, size: 40),
-                        ),
-                      )
-                    : const Icon(Icons.image, size: 40),
-                title: Text(nombre,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('Precio: S/. $precio'),
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 🔹 Barra de búsqueda
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Buscar producto...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            FocusScope.of(context).unfocus();
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                ),
               ),
-            );
-          },
-        );
-      },
+            ),
+
+            // 🔹 Lista de productos 
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _onRefresh,
+                color: Colors.blue,
+                displacement: 40,
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('productos')
+                      .orderBy('Nombre')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(child: Text('No hay productos'));
+                    }
+
+                    final productos = snapshot.data!.docs.where((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final nombre =
+                          (data['Nombre'] ?? '').toString().toLowerCase();
+                      return nombre.contains(_searchQuery);
+                    }).toList();
+
+                    if (productos.isEmpty) {
+                      return const Center(child: Text('Sin resultados'));
+                    }
+
+                    return ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: productos.length,
+                      itemBuilder: (context, index) {
+                        final data =
+                            productos[index].data() as Map<String, dynamic>;
+
+                        final nombre = data['Nombre'] ?? 'Sin nombre';
+                        final marca = data['Marca'] ?? 'Sin marca';
+                        final cantidad = data['Cantidad'] ?? '-';
+                        final precio = data['Precio'] ?? 0;
+                        final stock = data['Stock'] ?? 0;
+                        final disponible = data['Disponibilidad'] ?? false;
+                        final imagenUrl =
+                            _formatearEnlaceDrive(data['imagen']);
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            leading: imagenUrl.isNotEmpty
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      imagenUrl,
+                                      width: 65,
+                                      height: 65,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder:
+                                          (context, child, progress) {
+                                        if (progress == null) return child;
+                                        return const SizedBox(
+                                          width: 65,
+                                          height: 65,
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              const Icon(Icons.broken_image,
+                                                  size: 50),
+                                    ),
+                                  )
+                                : const Icon(Icons.image, size: 50),
+                            title: Text(
+                              nombre,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Marca: $marca'),
+                                Text('Cantidad: $cantidad'),
+                                Text('Precio: S/. $precio'),
+                                Text('Stock: $stock'),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      disponible
+                                          ? Icons.check_circle
+                                          : Icons.cancel,
+                                      color: disponible
+                                          ? Colors.green
+                                          : Colors.red,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      disponible
+                                          ? 'Disponible'
+                                          : 'Agotado',
+                                      style: TextStyle(
+                                        color: disponible
+                                            ? Colors.green
+                                            : Colors.red,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -4,10 +4,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'productos_screen.dart';
 import 'clientes_screen.dart';
 import 'proveedores_screen.dart';
+import 'dart:async';
 
-Future<void> main() async { // 👈 Agregar "Future" y "async"
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // 👈 Ahora sí puede usar await
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -18,7 +19,85 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'App Firestore',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: HomePage(),
+      home: SplashScreen(),
+    );
+  }
+}
+
+class SplashScreen extends StatefulWidget {
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  double progress = 0.0;
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      setState(() {
+        progress += 2;
+        if (progress >= 100) {
+          progress = 100;
+          _timer.cancel();
+          Future.delayed(const Duration(milliseconds: 500), () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
+          });
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/logo.png',
+                width: 200,
+                height: 200,
+              ),
+              const SizedBox(height: 40),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: progress / 100,
+                  minHeight: 12,
+                  backgroundColor: Colors.grey[300],
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                "Cargando... ${progress.toInt()}%",
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
