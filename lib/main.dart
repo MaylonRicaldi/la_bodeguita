@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'productos_screen.dart';
 import 'clientes_screen.dart';
@@ -18,7 +17,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'App Firestore',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: ThemeData(primarySwatch: Colors.teal),
       home: SplashScreen(),
     );
   }
@@ -38,17 +37,23 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (!mounted) return;
       setState(() {
         progress += 2;
         if (progress >= 100) {
           progress = 100;
           _timer.cancel();
-          Future.delayed(const Duration(milliseconds: 500), () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomePage()),
-            );
-          });
+
+          if (mounted) {
+            Future.delayed(const Duration(milliseconds: 400), () {
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomePage()),
+                );
+              }
+            });
+          }
         }
       });
     });
@@ -70,11 +75,7 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/logo.png',
-                width: 200,
-                height: 200,
-              ),
+              Image.asset('assets/logo.png', width: 200, height: 200),
               const SizedBox(height: 40),
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
@@ -82,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen>
                   value: progress / 100,
                   minHeight: 12,
                   backgroundColor: Colors.grey[300],
-                  color: Colors.blue,
+                  color: Colors.teal,
                 ),
               ),
               const SizedBox(height: 20),
@@ -116,23 +117,21 @@ class _HomePageState extends State<HomePage> {
     ProveedoresScreen(),
   ];
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(['Productos', 'Clientes', 'Proveedores'][_selectedIndex]),
-        centerTitle: true,
-      ),
+      appBar: _selectedIndex == 0
+          ? null
+          : AppBar(
+              title: Text(['Productos', 'Clientes', 'Proveedores'][_selectedIndex]),
+              centerTitle: true,
+              backgroundColor: Colors.teal,
+            ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+        onTap: (i) => setState(() => _selectedIndex = i),
+        selectedItemColor: Colors.teal,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag),
