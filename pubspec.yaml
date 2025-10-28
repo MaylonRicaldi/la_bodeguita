@@ -18,6 +18,7 @@ dependencies:
   animate_do: ^3.1.2        # Para animaciones suaves
   badges: ^3.1.2            # Para mostrar el número del carrito
   pull_to_refresh: ^2.0.0   # (opcional, si usas 'jalar para refrescar')
+  firebase_auth: ^4.16.0
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'productos_screen.dart';
 import 'clientes_screen.dart';
 import 'proveedores_screen.dart';
+import 'auth_screen.dart';
 import 'dart:async';
 
 Future<void> main() async {
