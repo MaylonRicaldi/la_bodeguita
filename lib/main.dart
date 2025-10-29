@@ -105,29 +105,37 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 class HomePage extends StatefulWidget {
+  final int initialIndex;
+  final Map<String, dynamic>? usuarioData;
+
+  const HomePage({Key? key, this.initialIndex = 0, this.usuarioData})
+      : super(key: key);
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
-  final List<Widget> _pages = [
-    ProductosScreen(),
-    ClientesScreen(),
-    ProveedoresScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final usuario = widget.usuarioData;
+
+    final List<Widget> _pages = [
+      ProductosScreen(),
+      ClientesScreen(usuarioData: usuario),
+      ProveedoresScreen(),
+    ];
+
     return Scaffold(
-      appBar: _selectedIndex == 0
-          ? null
-          : AppBar(
-              title: Text(['Productos', 'Clientes', 'Proveedores'][_selectedIndex]),
-              centerTitle: true,
-              backgroundColor: Colors.teal,
-            ),
+      // 🚫 Se elimina completamente la AppBar
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -140,11 +148,11 @@ class _HomePageState extends State<HomePage> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people),
-            label: 'Clientes',
+            label: 'Perfil',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.local_shipping),
-            label: 'Proveedores',
+            label: 'Ubicación',
           ),
         ],
       ),

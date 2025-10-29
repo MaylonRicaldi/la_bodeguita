@@ -5,7 +5,7 @@ class ProveedoresScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        'Pantalla de Proveedores',
+        'Pantalla en mantenimiento',
         style: TextStyle(fontSize: 18),
       ),
     );

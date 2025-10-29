@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'clientes_screen.dart';
+import 'main.dart';
 
 class AuthScreen extends StatefulWidget {
   @override
@@ -8,21 +9,18 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final TextEditingController entradaController = TextEditingController(); // correo o teléfono
+  final TextEditingController entradaController = TextEditingController();
   final TextEditingController nombreController = TextEditingController();
   final TextEditingController contrasenaController = TextEditingController();
 
   bool isLogin = true;
   bool isLoading = false;
+  bool ocultarPassword = true;
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // ===============================
-  // REGISTRAR USUARIO NUEVO
-  // ===============================
   Future<void> registrarUsuario() async {
     setState(() => isLoading = true);
-
     try {
       String entrada = entradaController.text.trim();
       String contrasena = contrasenaController.text.trim();
@@ -36,15 +34,12 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
 
-      // Detectar si es correo o teléfono
       bool esCorreo = entrada.contains('@');
 
-      // Generar ID automático tipo USU001
       QuerySnapshot snapshot = await _firestore.collection('usuarios').get();
       int nuevoId = snapshot.docs.length + 1;
       String userId = 'USU${nuevoId.toString().padLeft(3, '0')}';
 
-      // Guardar en Firestore
       await _firestore.collection('usuarios').doc(userId).set({
         'id': userId,
         'nombre': nombre,
@@ -64,120 +59,181 @@ class _AuthScreenState extends State<AuthScreen> {
         SnackBar(content: Text("Error al registrar: $e")),
       );
     }
-
     setState(() => isLoading = false);
   }
 
-  // ===============================
-  // INICIAR SESIÓN
-  // ===============================
   Future<void> iniciarSesion() async {
-  setState(() => isLoading = true);
+    setState(() => isLoading = true);
+    try {
+      String entrada = entradaController.text.trim();
+      String contrasena = contrasenaController.text.trim();
 
-  try {
-    String entrada = entradaController.text.trim();
-    String contrasena = contrasenaController.text.trim();
+      bool esCorreo = entrada.contains('@');
 
-    // Detectar si es correo o teléfono
-    bool esCorreo = entrada.contains('@');
+      QuerySnapshot usuarios = await _firestore
+          .collection('usuarios')
+          .where(esCorreo ? 'email' : 'telefono', isEqualTo: entrada)
+          .where('contrasena', isEqualTo: contrasena)
+          .get();
 
-    // Consulta a Firestore directamente según el tipo de entrada
-    QuerySnapshot usuarios = await _firestore
-        .collection('usuarios')
-        .where(esCorreo ? 'email' : 'telefono', isEqualTo: entrada)
-        .where('contrasena', isEqualTo: contrasena)
-        .get();
+      if (usuarios.docs.isNotEmpty) {
+        var usuarioEncontrado =
+            usuarios.docs.first.data() as Map<String, dynamic>;
 
-    if (usuarios.docs.isNotEmpty) {
-      var usuarioEncontrado = usuarios.docs.first.data() as Map<String, dynamic>;
-
-      // ✅ Ir directamente a la pantalla de clientes
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ClientesScreen(usuarioData: usuarioEncontrado),
-        ),
-      );
-    } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomePage(
+              initialIndex: 1,
+              usuarioData: usuarioEncontrado,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Correo/teléfono o contraseña incorrectos")),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Correo/teléfono o contraseña incorrectos")),
+        SnackBar(content: Text("Error al iniciar sesión: $e")),
       );
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Error al iniciar sesión: $e")),
-    );
+    setState(() => isLoading = false);
   }
 
-  setState(() => isLoading = false);
-}
-
-
-  // ===============================
-  // UI
-  // ===============================
   @override
   Widget build(BuildContext context) {
     final color = Colors.teal;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.store, color: Colors.teal, size: 100),
-              const SizedBox(height: 20),
-              Text(
-                isLogin ? "Iniciar Sesión" : "Crear Cuenta",
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF00BFA5), Color(0xFF00796B)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              if (!isLogin)
-                TextField(
-                  controller: nombreController,
-                  decoration: const InputDecoration(labelText: "Nombre completo"),
-                ),
-              TextField(
-                controller: entradaController,
-                decoration: const InputDecoration(
-                    labelText: "Correo electrónico o teléfono"),
-              ),
-              TextField(
-                controller: contrasenaController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Contraseña"),
-              ),
-              const SizedBox(height: 20),
-              isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: isLogin ? iniciarSesion : registrarUsuario,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: color,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 40, vertical: 14),
-                      ),
-                      child: Text(
-                        isLogin ? "Ingresar" : "Registrar",
-                        style: const TextStyle(fontSize: 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.storefront_rounded,
+                      color: Colors.teal, size: 80),
+                  const SizedBox(height: 12),
+                  Text(
+                    isLogin ? "Bienvenido de nuevo" : "Crear nueva cuenta",
+                    style: const TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    isLogin
+                        ? "Inicia sesión para continuar"
+                        : "Completa tus datos para registrarte",
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 25),
+
+                  if (!isLogin)
+                    TextField(
+                      controller: nombreController,
+                      decoration: InputDecoration(
+                        labelText: "Nombre completo",
+                        prefixIcon: const Icon(Icons.person_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-              const SizedBox(height: 10),
-              TextButton(
-                onPressed: () => setState(() => isLogin = !isLogin),
-                child: Text(
-                  isLogin
-                      ? "¿No tienes cuenta? Regístrate"
-                      : "¿Ya tienes cuenta? Inicia sesión",
-                  style: const TextStyle(color: Colors.teal),
-                ),
+                  if (!isLogin) const SizedBox(height: 15),
+
+                  TextField(
+                    controller: entradaController,
+                    decoration: InputDecoration(
+                      labelText: "Correo electrónico o teléfono",
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextField(
+                    controller: contrasenaController,
+                    obscureText: ocultarPassword,
+                    decoration: InputDecoration(
+                      labelText: "Contraseña",
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          ocultarPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => ocultarPassword = !ocultarPassword),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 25),
+                  isLoading
+                      ? const CircularProgressIndicator(color: Colors.teal)
+                      : ElevatedButton(
+                          onPressed:
+                              isLogin ? iniciarSesion : registrarUsuario,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: color,
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            isLogin ? "Iniciar sesión" : "Registrar cuenta",
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                  const SizedBox(height: 15),
+                  TextButton(
+                    onPressed: () => setState(() => isLogin = !isLogin),
+                    child: Text(
+                      isLogin
+                          ? "¿No tienes cuenta? Regístrate"
+                          : "¿Ya tienes cuenta? Inicia sesión",
+                      style: const TextStyle(
+                        color: Colors.teal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
