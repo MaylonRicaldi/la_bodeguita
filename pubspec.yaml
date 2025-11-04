@@ -35,3 +35,5 @@ flutter:
 
   assets:
     - assets/logo.png
+    - assets/bodeguita_icon.png
+    - assets/persona_icon.png
