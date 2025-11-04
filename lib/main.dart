@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // ✅ Import necesario para signOut
 import 'productos_screen.dart';
 import 'clientes_screen.dart';
-import 'proveedores_screen.dart';
+import 'tienda_screen.dart';
 import 'auth_screen.dart';
 import 'dart:async';
 
@@ -136,7 +136,7 @@ class _HomePageState extends State<HomePage> {
     final List<Widget> _pages = [
       ProductosScreen(),
       ClientesScreen(usuarioData: usuario),
-      ProveedoresScreen(),
+      TiendaScreen(),
     ];
 
     return Scaffold(
