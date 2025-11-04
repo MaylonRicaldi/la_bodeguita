@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Import necesario para signOut
 import 'productos_screen.dart';
 import 'clientes_screen.dart';
 import 'proveedores_screen.dart';
@@ -9,6 +10,10 @@ import 'dart:async';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // 🔹 Cierra sesión automáticamente al abrir la app
+  await FirebaseAuth.instance.signOut();
+
   runApp(MyApp());
 }
 
@@ -135,7 +140,6 @@ class _HomePageState extends State<HomePage> {
     ];
 
     return Scaffold(
-      // 🚫 Se elimina completamente la AppBar
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,

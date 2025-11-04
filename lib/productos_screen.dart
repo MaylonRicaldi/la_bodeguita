@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:badges/badges.dart' as badges;
 import 'carrito_screen.dart';
 import 'producto_detalle_screen.dart';
-import 'carrito_global.dart'; // <-- carrito global
+import 'carrito_global.dart';
 
 class ProductosScreen extends StatefulWidget {
   @override
@@ -12,10 +12,20 @@ class ProductosScreen extends StatefulWidget {
 
 class _ProductosScreenState extends State<ProductosScreen>
     with SingleTickerProviderStateMixin {
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
-  // ya no usamos lista local persistente (usamos carritoGlobal)
+  // ✅ Quitar tildes para buscar
+  String quitarAcentos(String texto) {
+    const acentos = {
+      'á':'a','é':'e','í':'i','ó':'o','ú':'u',
+      'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U',
+      'ñ':'n','Ñ':'N'
+    };
+    return texto.split('').map((c) => acentos[c] ?? c).join();
+  }
+
   late AnimationController _animController;
 
   @override
@@ -35,7 +45,7 @@ class _ProductosScreenState extends State<ProductosScreen>
 
   void _onSearchChanged() {
     if (!mounted) return;
-    setState(() => _searchQuery = _searchController.text.trim().toLowerCase());
+    setState(() => _searchQuery = quitarAcentos(_searchController.text.trim().toLowerCase()));
   }
 
   String _formatearEnlaceDrive(String? url) {
@@ -54,7 +64,6 @@ class _ProductosScreenState extends State<ProductosScreen>
     setState(() {});
   }
 
-  // suma total de items (cantidad) para el badge
   int _totalItemsEnCarrito() {
     return carritoGlobal.fold<int>(0, (sum, it) => sum + ((it['cantidad'] ?? 1) as int));
   }
@@ -64,16 +73,13 @@ class _ProductosScreenState extends State<ProductosScreen>
     final precio = double.tryParse(producto['Precio'].toString()) ?? 0.0;
     final imagen = _formatearEnlaceDrive(producto['imagen']);
 
-    // buscar por nombre (igual que lo definiste)
     final index = carritoGlobal.indexWhere((item) => item['nombre'] == nombre);
 
     if (index != -1) {
-      // si existe, incrementa cantidad
       carritoGlobal[index]['cantidad'] = (carritoGlobal[index]['cantidad'] ?? 1) + 1;
       carritoGlobal[index]['total'] =
           carritoGlobal[index]['cantidad'] * carritoGlobal[index]['precio'];
     } else {
-      // nuevo item
       carritoGlobal.add({
         'nombre': nombre,
         'precio': precio,
@@ -84,41 +90,37 @@ class _ProductosScreenState extends State<ProductosScreen>
     }
 
     if (!mounted) return;
-    // anima el badge
+
     _animController.forward(from: 0);
 
-    // muestra snackbar y actualiza contador
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$nombre añadido al carrito 🛒'),
+        content: Text('$nombre añadido al carrito'),
         duration: const Duration(seconds: 2),
         backgroundColor: Colors.teal,
       ),
     );
 
-    setState(() {}); // refresca badge
+    setState(() {});
   }
 
   Future<void> _abrirCarrito() async {
     if (!mounted) return;
-    // abrimos la pantalla del carrito pasando la referencia actual
-    final updated = await Navigator.push(
+
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => CarritoScreen(initialCart: carritoGlobal),
       ),
     );
 
-    // si la pantalla del carrito devolvió algo (por ejemplo al pulsar volver),
-    // actualizamos estado localmente (carritoGlobal ya fue modificado en la pantalla)
     if (!mounted) return;
-    // actualizamos para refrescar badge (si se cambió cantidad o eliminó)
     setState(() {});
   }
 
   void _abrirDetalleProducto(Map<String, dynamic> producto) async {
     if (!mounted) return;
-    // tu detalle NO agrega al carrito (según tu último mensaje) — sólo muestra
+
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -126,7 +128,6 @@ class _ProductosScreenState extends State<ProductosScreen>
       ),
     );
 
-    // después de volver, actualizamos badge por si el detalle devolviera cambios (no lo hace ahora)
     if (!mounted) return;
     setState(() {});
   }
@@ -138,7 +139,8 @@ class _ProductosScreenState extends State<ProductosScreen>
     return SafeArea(
       child: Column(
         children: [
-          // 🔹 Encabezado con carrito animado (badge usa _totalItemsEnCarrito)
+
+          // ✅ Encabezado
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
@@ -151,10 +153,7 @@ class _ProductosScreenState extends State<ProductosScreen>
                         color: turquesa)),
                 ScaleTransition(
                   scale: Tween<double>(begin: 1, end: 1.3).animate(
-                    CurvedAnimation(
-                      parent: _animController,
-                      curve: Curves.easeOutBack,
-                    ),
+                    CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
                   ),
                   child: GestureDetector(
                     onTap: _abrirCarrito,
@@ -177,7 +176,7 @@ class _ProductosScreenState extends State<ProductosScreen>
             ),
           ),
 
-          // 🔹 Barra de búsqueda
+          // ✅ Buscador
           Padding(
             padding: const EdgeInsets.all(10),
             child: TextField(
@@ -203,7 +202,7 @@ class _ProductosScreenState extends State<ProductosScreen>
             ),
           ),
 
-          // 🔹 Rejilla de productos (sin cambiar tu UI)
+          // ✅ Lista de Productos
           Expanded(
             child: RefreshIndicator(
               onRefresh: _onRefresh,
@@ -215,27 +214,20 @@ class _ProductosScreenState extends State<ProductosScreen>
                     .orderBy('Nombre')
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text('No hay productos'));
-                  }
+                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
                   final productos = snapshot.data!.docs.where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
+                    final nombre = quitarAcentos((data['Nombre'] ?? '').toString().toLowerCase());
                     final disponible = data['Disponibilidad'] == true ||
-                        (data['Disponibilidad']?.toString().toLowerCase() == 'true');
-                    final nombre = (data['Nombre'] ?? '').toString().toLowerCase();
+                        data['Disponibilidad'].toString().toLowerCase() == 'true';
                     return disponible && nombre.startsWith(_searchQuery);
                   }).toList();
 
-                  if (productos.isEmpty) {
-                    return const Center(child: Text('Sin resultados'));
-                  }
+                  if (productos.isEmpty) return const Center(child: Text("Sin resultados"));
 
                   return GridView.builder(
+                    key: const PageStorageKey('grid_productos'), // ✅ Mantiene la posición del scroll
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -269,7 +261,8 @@ class _ProductosScreenState extends State<ProductosScreen>
                                               imagenUrl,
                                               fit: BoxFit.cover,
                                               width: double.infinity,
-                                              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 80),
+                                              errorBuilder: (_, __, ___) =>
+                                                  const Icon(Icons.broken_image, size: 80),
                                             )
                                           : const Icon(Icons.image, size: 80),
                                     ),
@@ -287,16 +280,23 @@ class _ProductosScreenState extends State<ProductosScreen>
                                     padding: const EdgeInsets.only(left: 8, right: 8, bottom: 6),
                                     child: ElevatedButton.icon(
                                       onPressed: () => _agregarAlCarrito(data),
-                                      icon: const Icon(Icons.add_shopping_cart),
-                                      label: const Text("Agregar"),
+                                      icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
+                                      label: const Text(
+                                        "Agregar",
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      ),
+
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: turquesa,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        backgroundColor: Colors.teal,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
+
                               Positioned(
                                 right: 8,
                                 top: 8,
@@ -308,7 +308,8 @@ class _ProductosScreenState extends State<ProductosScreen>
                                   ),
                                   child: Text(
                                     'S/. ${precio.toStringAsFixed(2)}',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ),

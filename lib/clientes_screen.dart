@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'auth_screen.dart'; // Para regresar al login
+import 'historial_pedidos_screen.dart';
 
 class ClientesScreen extends StatelessWidget {
   final Map<String, dynamic>? usuarioData;
@@ -75,9 +76,9 @@ class ClientesScreen extends StatelessWidget {
               titulo: "Mis pedidos",
               subtitulo: "Ver historial de compras",
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text("Sección de pedidos próximamente")),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HistorialPedidosScreen()),
                 );
               },
             ),
