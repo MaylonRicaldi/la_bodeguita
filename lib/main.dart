@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ Import necesario para signOut
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'productos_screen.dart';
 import 'clientes_screen.dart';
 import 'tienda_screen.dart';
-import 'auth_screen.dart';
 import 'dart:async';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  // 🔹 Cierra sesión automáticamente al abrir la app
+  // Cierra sesión cada vez que se abre la app para permitir crear/usar otra cuenta
   await FirebaseAuth.instance.signOut();
 
   runApp(MyApp());
@@ -29,6 +30,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// ===================== SPLASH SCREEN =====================
 class SplashScreen extends StatefulWidget {
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -50,16 +52,15 @@ class _SplashScreenState extends State<SplashScreen>
           progress = 100;
           _timer.cancel();
 
-          if (mounted) {
-            Future.delayed(const Duration(milliseconds: 400), () {
-              if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => HomePage()),
-                );
-              }
-            });
-          }
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (mounted) {
+              // ✅ Ir al catálogo (Productos) como antes
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => HomePage(initialIndex: 0)),
+              );
+            }
+          });
         }
       });
     });
@@ -109,6 +110,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
+// ===================== HOME PAGE =====================
 class HomePage extends StatefulWidget {
   final int initialIndex;
   final Map<String, dynamic>? usuarioData;
@@ -122,20 +124,56 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late int _selectedIndex;
+  Map<String, dynamic>? usuarioData;
 
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
+    usuarioData = widget.usuarioData;
+    _cargarUsuarioSiExiste();
+  }
+
+  Future<void> _cargarUsuarioSiExiste() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => usuarioData = null);
+      return;
+    }
+
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('Usuarios')
+          .doc(user.uid)
+          .get();
+
+      if (snap.exists) {
+        setState(() => usuarioData = snap.data());
+      } else {
+        setState(() {
+          usuarioData = {
+            'nombre': user.displayName ?? 'Usuario',
+            'email': user.email ?? '',
+            'uid': user.uid,
+          };
+        });
+      }
+    } catch (e) {
+      debugPrint("⚠️ Error al cargar usuario: $e");
+    }
+  }
+
+  void _onTapNav(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final usuario = widget.usuarioData;
-
     final List<Widget> _pages = [
       ProductosScreen(),
-      ClientesScreen(usuarioData: usuario),
+      ClientesScreen(usuarioData: usuarioData),
       TiendaScreen(),
     ];
 
@@ -143,7 +181,7 @@ class _HomePageState extends State<HomePage> {
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+        onTap: _onTapNav,
         selectedItemColor: Colors.teal,
         items: const [
           BottomNavigationBarItem(
@@ -151,12 +189,12 @@ class _HomePageState extends State<HomePage> {
             label: 'Productos',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people),
+            icon: Icon(Icons.person),
             label: 'Perfil',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_shipping),
-            label: 'Ubicación',
+            icon: Icon(Icons.store_mall_directory),
+            label: 'Tienda',
           ),
         ],
       ),

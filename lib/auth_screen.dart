@@ -37,46 +37,39 @@ class _AuthScreenState extends State<AuthScreen> {
       final password = contrasenaController.text.trim();
       final nombre = nombreController.text.trim();
 
-      UserCredential cred;
-      try {
-        cred = await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-
-        await _firestore.collection('Usuarios').doc(cred.user!.uid).set({
-          'uid': cred.user!.uid,
-          'nombre': nombre,
-          'email': cred.user!.email,
-          'fechaRegistro': FieldValue.serverTimestamp(),
-        });
-
+      if (email.isEmpty || password.isEmpty || nombre.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Cuenta creada exitosamente.")),
+          const SnackBar(content: Text("Completa todos los campos")),
         );
-      } on FirebaseAuthException catch (e) {
-        if (e.code == 'email-already-in-use') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                "Este correo ya tiene una cuenta. Iniciando sesión...",
-              ),
-            ),
-          );
-          cred = await _auth.signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
-        } else {
-          rethrow;
-        }
+        setState(() => isLoading = false);
+        return;
       }
 
-      await _navegarDespuesLogin(cred.user!);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+      // Crear usuario en Firebase Auth
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
       );
+
+      // Guardar datos en Firestore
+      await _firestore.collection('Usuarios').doc(cred.user!.uid).set({
+        'uid': cred.user!.uid,
+        'nombre': nombre,
+        'email': cred.user!.email,
+        'fechaRegistro': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Cuenta creada correctamente")),
+      );
+
+      // Navegar después de registrar
+      await _navegarDespuesLogin(cred.user!);
+    } on FirebaseAuthException catch (e) {
+      String msg = e.message ?? e.code;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $msg")));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -96,24 +89,31 @@ class _AuthScreenState extends State<AuthScreen> {
       if (e.code == 'user-not-found') msg = "No existe una cuenta con ese correo.";
       if (e.code == 'wrong-password') msg = "Contraseña incorrecta.";
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
   Future<void> _navegarDespuesLogin(User user) async {
-    final usuarioData = {
-      'uid': user.uid,
-      'email': user.email ?? '',
-    };
+    // cargamos datos de Firestore si existen
+    final doc = await _firestore.collection('Usuarios').doc(user.uid).get();
+    final usuarioData = doc.exists ? doc.data() : {'uid': user.uid, 'email': user.email};
 
-    if (widget.fromCart && widget.total != null && widget.productos != null) {
+    if (widget.fromCart) {
+      if (widget.productos == null || widget.total == null) {
+        // datos del carrito faltan: volvemos
+        Navigator.pop(context);
+        return;
+      }
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => PagoScreen(
             usuarioData: usuarioData,
-            productos: widget.productos!,
+            productos: List<Map<String, dynamic>>.from(widget.productos!),
             subtotal: widget.total!,
           ),
         ),
@@ -121,6 +121,14 @@ class _AuthScreenState extends State<AuthScreen> {
     } else {
       Navigator.pop(context);
     }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    nombreController.dispose();
+    contrasenaController.dispose();
+    super.dispose();
   }
 
   @override

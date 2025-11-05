@@ -49,7 +49,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
     final usuario = FirebaseAuth.instance.currentUser;
 
     if (usuario == null) {
-      // 🔐 Si no hay sesión → ir al login, pasando carrito y total
+      // Si no hay sesión → ir al AuthScreen. Pasamos productos y total para continuar.
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -61,7 +61,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
         ),
       );
     } else {
-      // ✅ Si hay sesión → ir directo al pago
+      // Si ya está logueado → ir al PagoScreen
       Navigator.push(
         context,
         MaterialPageRoute(
