@@ -12,16 +12,24 @@ class ProductosScreen extends StatefulWidget {
 
 class _ProductosScreenState extends State<ProductosScreen>
     with SingleTickerProviderStateMixin {
-
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
   // ✅ Quitar tildes para buscar
   String quitarAcentos(String texto) {
     const acentos = {
-      'á':'a','é':'e','í':'i','ó':'o','ú':'u',
-      'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U',
-      'ñ':'n','Ñ':'N'
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'Á': 'A',
+      'É': 'E',
+      'Í': 'I',
+      'Ó': 'O',
+      'Ú': 'U',
+      'ñ': 'n',
+      'Ñ': 'N'
     };
     return texto.split('').map((c) => acentos[c] ?? c).join();
   }
@@ -32,8 +40,8 @@ class _ProductosScreenState extends State<ProductosScreen>
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _animController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 400));
+    _animController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
   }
 
   @override
@@ -45,7 +53,8 @@ class _ProductosScreenState extends State<ProductosScreen>
 
   void _onSearchChanged() {
     if (!mounted) return;
-    setState(() => _searchQuery = quitarAcentos(_searchController.text.trim().toLowerCase()));
+    setState(() =>
+        _searchQuery = quitarAcentos(_searchController.text.trim().toLowerCase()));
   }
 
   String _formatearEnlaceDrive(String? url) {
@@ -65,7 +74,8 @@ class _ProductosScreenState extends State<ProductosScreen>
   }
 
   int _totalItemsEnCarrito() {
-    return carritoGlobal.fold<int>(0, (sum, it) => sum + ((it['cantidad'] ?? 1) as int));
+    return carritoGlobal.fold<int>(
+        0, (sum, it) => sum + ((it['cantidad'] ?? 1) as int));
   }
 
   void _agregarAlCarrito(Map<String, dynamic> producto) {
@@ -76,7 +86,8 @@ class _ProductosScreenState extends State<ProductosScreen>
     final index = carritoGlobal.indexWhere((item) => item['nombre'] == nombre);
 
     if (index != -1) {
-      carritoGlobal[index]['cantidad'] = (carritoGlobal[index]['cantidad'] ?? 1) + 1;
+      carritoGlobal[index]['cantidad'] =
+          (carritoGlobal[index]['cantidad'] ?? 1) + 1;
       carritoGlobal[index]['total'] =
           carritoGlobal[index]['cantidad'] * carritoGlobal[index]['precio'];
     } else {
@@ -139,7 +150,6 @@ class _ProductosScreenState extends State<ProductosScreen>
     return SafeArea(
       child: Column(
         children: [
-
           // ✅ Encabezado
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -153,7 +163,8 @@ class _ProductosScreenState extends State<ProductosScreen>
                         color: turquesa)),
                 ScaleTransition(
                   scale: Tween<double>(begin: 1, end: 1.3).animate(
-                    CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
+                    CurvedAnimation(
+                        parent: _animController, curve: Curves.easeOutBack),
                   ),
                   child: GestureDetector(
                     onTap: _abrirCarrito,
@@ -162,13 +173,16 @@ class _ProductosScreenState extends State<ProductosScreen>
                       position: badges.BadgePosition.topEnd(top: -10, end: -6),
                       badgeContent: Text(
                         _totalItemsEnCarrito().toString(),
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       ),
                       badgeStyle: badges.BadgeStyle(
                         badgeColor: Colors.redAccent,
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                       ),
-                      child: Icon(Icons.shopping_cart, size: 32, color: turquesa),
+                      child: Icon(Icons.shopping_cart,
+                          size: 32, color: turquesa),
                     ),
                   ),
                 ),
@@ -214,23 +228,28 @@ class _ProductosScreenState extends State<ProductosScreen>
                     .orderBy('Nombre')
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  if (!snapshot.hasData)
+                    return const Center(child: CircularProgressIndicator());
 
                   final productos = snapshot.data!.docs.where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    final nombre = quitarAcentos((data['Nombre'] ?? '').toString().toLowerCase());
+                    final nombre = quitarAcentos(
+                        (data['Nombre'] ?? '').toString().toLowerCase());
                     final disponible = data['Disponibilidad'] == true ||
-                        data['Disponibilidad'].toString().toLowerCase() == 'true';
+                        data['Disponibilidad'].toString().toLowerCase() ==
+                            'true';
                     return disponible && nombre.startsWith(_searchQuery);
                   }).toList();
 
-                  if (productos.isEmpty) return const Center(child: Text("Sin resultados"));
+                  if (productos.isEmpty)
+                    return const Center(child: Text("Sin resultados"));
 
                   return GridView.builder(
-                    key: const PageStorageKey('grid_productos'), // ✅ Mantiene la posición del scroll
+                    key: const PageStorageKey('grid_productos'),
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       childAspectRatio: 0.7,
                       crossAxisSpacing: 8,
@@ -238,70 +257,92 @@ class _ProductosScreenState extends State<ProductosScreen>
                     ),
                     itemCount: productos.length,
                     itemBuilder: (context, index) {
-                      final data = productos[index].data() as Map<String, dynamic>;
+                      final data =
+                          productos[index].data() as Map<String, dynamic>;
                       final nombre = data['Nombre'] ?? 'Sin nombre';
-                      final precio = double.tryParse(data['Precio'].toString()) ?? 0.0;
-                      final imagenUrl = _formatearEnlaceDrive(data['imagen']);
+                      final precio =
+                          double.tryParse(data['Precio'].toString()) ?? 0.0;
+                      final imagenUrl =
+                          _formatearEnlaceDrive(data['imagen']);
 
                       return GestureDetector(
                         onTap: () => _abrirDetalleProducto(data),
                         child: Card(
                           elevation: 3,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                           child: Stack(
                             children: [
                               Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
                                 children: [
                                   Expanded(
                                     child: ClipRRect(
-                                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                                      borderRadius:
+                                          const BorderRadius.vertical(
+                                              top: Radius.circular(12)),
                                       child: imagenUrl.isNotEmpty
                                           ? Image.network(
                                               imagenUrl,
                                               fit: BoxFit.cover,
                                               width: double.infinity,
                                               errorBuilder: (_, __, ___) =>
-                                                  const Icon(Icons.broken_image, size: 80),
+                                                  const Icon(Icons.broken_image,
+                                                      size: 80),
                                             )
                                           : const Icon(Icons.image, size: 80),
                                     ),
                                   ),
+
+                                  // ✅ Nombre con espacio fijo de 2 líneas
                                   Padding(
                                     padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      nombre,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    child: SizedBox(
+                                      height: 40,
+                                      child: Text(
+                                        nombre,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.start,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
                                     ),
                                   ),
+
                                   Padding(
-                                    padding: const EdgeInsets.only(left: 8, right: 8, bottom: 6),
+                                    padding: const EdgeInsets.only(
+                                        left: 8, right: 8, bottom: 6),
                                     child: ElevatedButton.icon(
                                       onPressed: () => _agregarAlCarrito(data),
-                                      icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
+                                      icon: const Icon(Icons.add_shopping_cart,
+                                          color: Colors.white),
                                       label: const Text(
                                         "Agregar",
-                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold),
                                       ),
-
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-
                               Positioned(
                                 right: 8,
                                 top: 8,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withOpacity(0.6),
                                     borderRadius: BorderRadius.circular(8),
@@ -309,7 +350,8 @@ class _ProductosScreenState extends State<ProductosScreen>
                                   child: Text(
                                     'S/. ${precio.toStringAsFixed(2)}',
                                     style: const TextStyle(
-                                        color: Colors.white, fontWeight: FontWeight.bold),
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ),

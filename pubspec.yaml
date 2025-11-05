@@ -35,5 +35,11 @@ flutter:
 
   assets:
     - assets/logo.png
+    - assets/carrito1.png
+    - assets/carrito2.png
+    - assets/carrito3.png
     - assets/bodeguita_icon.png
     - assets/persona_icon.png
+    - assets/fondo_parque.png
+    - assets/nube1.png
+    - assets/nube2.png
