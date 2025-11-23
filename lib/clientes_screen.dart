@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth_screen.dart';
 import 'historial_pedidos_screen.dart';
+import 'favoritos_screen.dart'; // <-- IMPORTA TU NUEVA PANTALLA
 
 class ClientesScreen extends StatefulWidget {
   final Map<String, dynamic>? usuarioData;
@@ -28,7 +29,6 @@ class _ClientesScreenState extends State<ClientesScreen> {
     setState(() => _cargando = true);
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      // si no hay sesión, dejamos vacío (invitado)
       setState(() {
         usuario = {};
         _cargando = false;
@@ -48,7 +48,6 @@ class _ClientesScreenState extends State<ClientesScreen> {
           _cargando = false;
         });
       } else {
-        // documento no existe en Firestore, mostramos datos básicos desde Auth
         setState(() {
           usuario = {
             "nombre": user.displayName ?? "Usuario",
@@ -59,7 +58,6 @@ class _ClientesScreenState extends State<ClientesScreen> {
         });
       }
     } catch (e) {
-      // si falla la lectura, usar datos de Auth si están
       setState(() {
         usuario = {
           "nombre": user?.displayName ?? "Usuario",
@@ -71,33 +69,49 @@ class _ClientesScreenState extends State<ClientesScreen> {
     }
   }
 
-  Future<void> _cerrarSesionYirLogin() async {
+  Future<void> _cerrarSesion() async {
     await FirebaseAuth.instance.signOut();
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const AuthScreen()),
-      (route) => false,
-    );
+    _cargarUsuarioFirebase();
   }
 
   @override
   Widget build(BuildContext context) {
     final nombre = usuario['nombre'] ?? 'Invitado';
     final correo = usuario['email'] ?? usuario['telefono'] ?? '';
+    final userLogueado = FirebaseAuth.instance.currentUser != null;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.teal,
         centerTitle: true,
-        title: const Text("Mi Perfil"),
+        title: Text(
+          "Mi Perfil",
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         actions: [
-          // cerrar sesión en la AppBar (solo ícono)
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _cerrarSesionYirLogin,
-            tooltip: "Cerrar sesión",
-          )
+          if (userLogueado)
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.white),
+              onPressed: _cerrarSesion,
+              tooltip: "Cerrar sesión",
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.login, color: Colors.white),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AuthScreen()),
+                );
+                _cargarUsuarioFirebase();
+              },
+              tooltip: "Iniciar sesión",
+            ),
         ],
       ),
       body: Stack(
@@ -152,13 +166,17 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   icono: Icons.favorite_border,
                   titulo: "Favoritos",
                   subtitulo: "Tus productos guardados",
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const FavoritosScreen()),
+                    );
+                  },
                 ),
               ],
             ),
           ),
 
-          // Loader encima mientras cargamos los datos (no borra la UI)
           if (_cargando)
             Container(
               color: Colors.black.withOpacity(0.2),

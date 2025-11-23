@@ -211,9 +211,21 @@ class _TiendaScreenState extends State<TiendaScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Cómo llegar a la tienda"),
-        backgroundColor: Colors.teal,
+      backgroundColor: Colors.teal,
+      title: Row(
+        children: [
+          Text(
+            "Cómo llegar a la tienda",
+            style: TextStyle(
+              fontSize: 22,                 // estilo Catálogo
+              fontWeight: FontWeight.bold,
+              color: Colors.white,         // color blanco
+            ),
+          ),
+        ],
       ),
+    ),
+
       body: (ubicacionUsuario == null || ubicacionTienda == null)
           ? Center(
               child: Column(

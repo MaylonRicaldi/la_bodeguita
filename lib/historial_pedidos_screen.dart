@@ -14,14 +14,15 @@ class HistorialPedidosScreen extends StatelessWidget {
       appBar: AppBar(
         elevation: 4,
         backgroundColor: Colors.teal,
+        centerTitle: true,
         title: const Text(
           "Historial de Pedidos",
           style: TextStyle(
+            color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: 22,
           ),
         ),
-        centerTitle: true,
       ),
       body: uid == null
           ? const Center(child: Text("Inicia sesión para ver tus pedidos"))
@@ -57,74 +58,68 @@ class HistorialPedidosScreen extends StatelessWidget {
                     final pedido = pedidos[i].data() as Map<String, dynamic>;
                     final total = pedido['total'] ?? 0.0;
                     final fecha = (pedido['fecha'] as Timestamp?)?.toDate();
-                    final numeroPedido = pedidos.length - i; // Pedido 1 al más reciente
+                    final numeroPedido = pedidos.length - i;
 
                     return GestureDetector(
-                      onTap: () => _mostrarDetallePedido(context, pedido, numeroPedido),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 14),
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
+                      onTap: () =>
+                          _mostrarDetallePedido(context, pedido, numeroPedido),
+                      child: Card(
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.07),
-                              blurRadius: 10,
-                              spreadRadius: 1,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: Colors.teal.shade100,
-                                borderRadius: BorderRadius.circular(14),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.shade100,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(
+                                  Icons.receipt_long,
+                                  color: Colors.teal,
+                                  size: 28,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.receipt_long,
-                                color: Colors.teal,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Pedido $numeroPedido",
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Pedido $numeroPedido",
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    fecha != null
-                                        ? "${fecha.day}/${fecha.month}/${fecha.year}   ${fecha.hour}:${fecha.minute.toString().padLeft(2, '0')}"
-                                        : "Fecha no disponible",
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 13,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      fecha != null
+                                          ? "${fecha.day}/${fecha.month}/${fecha.year}   ${fecha.hour}:${fecha.minute.toString().padLeft(2, '0')}"
+                                          : "Fecha no disponible",
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 13,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            Text(
-                              "S/. ${total.toStringAsFixed(2)}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal,
-                                fontSize: 16,
+                              Text(
+                                "S/. ${total.toStringAsFixed(2)}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.teal,
+                                  fontSize: 16,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -134,6 +129,8 @@ class HistorialPedidosScreen extends StatelessWidget {
             ),
     );
   }
+
+  // ====================== DETALLE DEL PEDIDO ======================
 
   void _mostrarDetallePedido(
       BuildContext context, Map<String, dynamic> pedido, int numeroPedido) {
@@ -169,7 +166,6 @@ class HistorialPedidosScreen extends StatelessWidget {
             ),
             const Divider(height: 25),
 
-            // ✅ Lista de productos con imagen
             ...productos.map((p) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -201,7 +197,8 @@ class HistorialPedidosScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      "x${p['cantidad']}  |  S/. ${(p['precio'] * p['cantidad']).toStringAsFixed(2)}",
+                      "x${p['cantidad']}  |  "
+                      "S/. ${(p['precio'] * p['cantidad']).toStringAsFixed(2)}",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: Colors.teal,

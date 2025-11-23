@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'pago_screen.dart';
+import 'carrito_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool fromCart;
@@ -22,6 +22,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
+
   final emailController = TextEditingController();
   final nombreController = TextEditingController();
   final contrasenaController = TextEditingController();
@@ -29,6 +30,26 @@ class _AuthScreenState extends State<AuthScreen> {
   bool isLogin = true;
   bool isLoading = false;
   bool ocultarPassword = true;
+
+  // --------------------------------------------------------
+  // FUNCIÓN NUEVA: Crear colección Favoritos automáticamente
+  // --------------------------------------------------------
+  Future<void> _crearColeccionFavoritos(String uid) async {
+    final ref = _firestore
+        .collection('Usuarios')
+        .doc(uid)
+        .collection('Favoritos');
+
+    final snap = await ref.limit(1).get();
+
+    if (snap.docs.isEmpty) {
+      await ref.doc("_init").set({
+        "creado": FieldValue.serverTimestamp(),
+        "dummy": true,
+      });
+    }
+  }
+  // --------------------------------------------------------
 
   Future<void> registrarUsuario() async {
     setState(() => isLoading = true);
@@ -45,13 +66,11 @@ class _AuthScreenState extends State<AuthScreen> {
         return;
       }
 
-      // Crear usuario en Firebase Auth
       final cred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Guardar datos en Firestore
       await _firestore.collection('Usuarios').doc(cred.user!.uid).set({
         'uid': cred.user!.uid,
         'nombre': nombre,
@@ -59,17 +78,24 @@ class _AuthScreenState extends State<AuthScreen> {
         'fechaRegistro': FieldValue.serverTimestamp(),
       });
 
+      // --------------------------------------------------------
+      // AQUI SE AGREGA FAVORITOS AL REGISTRARSE
+      // --------------------------------------------------------
+      await _crearColeccionFavoritos(cred.user!.uid);
+      // --------------------------------------------------------
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Cuenta creada correctamente")),
       );
 
-      // Navegar después de registrar
-      await _navegarDespuesLogin(cred.user!);
+      _navegarDespuesLogin(cred.user!);
     } on FirebaseAuthException catch (e) {
       String msg = e.message ?? e.code;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $msg")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $msg")));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -83,44 +109,28 @@ class _AuthScreenState extends State<AuthScreen> {
         password: contrasenaController.text.trim(),
       );
 
-      await _navegarDespuesLogin(cred.user!);
+      // --------------------------------------------------------
+      // AQUI SE ASEGURA QUE TENGA FAVORITOS AL INICIAR SESIÓN
+      // --------------------------------------------------------
+      await _crearColeccionFavoritos(cred.user!.uid);
+      // --------------------------------------------------------
+
+      _navegarDespuesLogin(cred.user!);
     } on FirebaseAuthException catch (e) {
       String msg = "Error al iniciar sesión.";
       if (e.code == 'user-not-found') msg = "No existe una cuenta con ese correo.";
       if (e.code == 'wrong-password') msg = "Contraseña incorrecta.";
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
-  Future<void> _navegarDespuesLogin(User user) async {
-    // cargamos datos de Firestore si existen
-    final doc = await _firestore.collection('Usuarios').doc(user.uid).get();
-    final usuarioData = doc.exists ? doc.data() : {'uid': user.uid, 'email': user.email};
-
-    if (widget.fromCart) {
-      if (widget.productos == null || widget.total == null) {
-        // datos del carrito faltan: volvemos
-        Navigator.pop(context);
-        return;
-      }
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PagoScreen(
-            usuarioData: usuarioData,
-            productos: List<Map<String, dynamic>>.from(widget.productos!),
-            subtotal: widget.total!,
-          ),
-        ),
-      );
-    } else {
-      Navigator.pop(context);
-    }
+  void _navegarDespuesLogin(User user) {
+    Navigator.pop(context);
   }
 
   @override
@@ -133,8 +143,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final color = Colors.teal;
-
     return Scaffold(
       body: Center(
         child: SingleChildScrollView(
@@ -152,15 +160,21 @@ class _AuthScreenState extends State<AuthScreen> {
                 TextField(
                   controller: nombreController,
                   decoration: const InputDecoration(
-                      labelText: "Nombre", border: OutlineInputBorder()),
+                    labelText: "Nombre",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               if (!isLogin) const SizedBox(height: 15),
+
               TextField(
                 controller: emailController,
                 decoration: const InputDecoration(
-                    labelText: "Correo", border: OutlineInputBorder()),
+                  labelText: "Correo",
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 15),
+
               TextField(
                 controller: contrasenaController,
                 obscureText: ocultarPassword,
@@ -175,28 +189,36 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 25),
+
               isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton(
                       onPressed: isLogin ? iniciarSesion : registrarUsuario,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: color,
+                        backgroundColor: Colors.teal,
                         minimumSize: const Size(double.infinity, 50),
                       ),
                       child: Text(
                         isLogin ? "Iniciar sesión" : "Registrarse",
                         style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
+
               const SizedBox(height: 15),
+
               TextButton(
                 onPressed: () => setState(() => isLogin = !isLogin),
                 child: Text(
                   isLogin
                       ? "¿No tienes cuenta? Regístrate"
                       : "¿Ya tienes cuenta? Inicia sesión",
+                  style: const TextStyle(color: Colors.black),
                 ),
               ),
             ],

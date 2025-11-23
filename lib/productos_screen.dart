@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:badges/badges.dart' as badges;
 import 'carrito_screen.dart';
 import 'producto_detalle_screen.dart';
 import 'carrito_global.dart';
+import 'perfil_screen.dart';
 
 class ProductosScreen extends StatefulWidget {
   @override
@@ -15,21 +17,14 @@ class _ProductosScreenState extends State<ProductosScreen>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
-  // ✅ Quitar tildes para buscar
+  String? uid; // 👈 AGREGADO: saber si hay usuario
+  Set<String> favoritosIds = {}; // 👈 AGREGADO: IDs favoritos guardados
+
   String quitarAcentos(String texto) {
     const acentos = {
-      'á': 'a',
-      'é': 'e',
-      'í': 'i',
-      'ó': 'o',
-      'ú': 'u',
-      'Á': 'A',
-      'É': 'E',
-      'Í': 'I',
-      'Ó': 'O',
-      'Ú': 'U',
-      'ñ': 'n',
-      'Ñ': 'N'
+      'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+      'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U',
+      'ñ': 'n', 'Ñ': 'N'
     };
     return texto.split('').map((c) => acentos[c] ?? c).join();
   }
@@ -39,9 +34,27 @@ class _ProductosScreenState extends State<ProductosScreen>
   @override
   void initState() {
     super.initState();
+
+    uid = FirebaseAuth.instance.currentUser?.uid; // 👈 AGREGADO
+
+    // 👇 AGREGADO: escuchar favoritos en tiempo real
+    if (uid != null) {
+      FirebaseFirestore.instance
+          .collection("favoritos")
+          .doc(uid)
+          .collection("items")
+          .snapshots()
+          .listen((snap) {
+        favoritosIds = snap.docs.map((d) => d.id).toSet();
+        if (mounted) setState(() {});
+      });
+    }
+
     _searchController.addListener(_onSearchChanged);
     _animController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
   }
 
   @override
@@ -53,8 +66,7 @@ class _ProductosScreenState extends State<ProductosScreen>
 
   void _onSearchChanged() {
     if (!mounted) return;
-    setState(() =>
-        _searchQuery = quitarAcentos(_searchController.text.trim().toLowerCase()));
+    setState(() => _searchQuery = quitarAcentos(_searchController.text.trim().toLowerCase()));
   }
 
   String _formatearEnlaceDrive(String? url) {
@@ -74,8 +86,7 @@ class _ProductosScreenState extends State<ProductosScreen>
   }
 
   int _totalItemsEnCarrito() {
-    return carritoGlobal.fold<int>(
-        0, (sum, it) => sum + ((it['cantidad'] ?? 1) as int));
+    return carritoGlobal.fold<int>(0, (sum, it) => sum + ((it['cantidad'] ?? 1) as int));
   }
 
   void _agregarAlCarrito(Map<String, dynamic> producto) {
@@ -115,19 +126,42 @@ class _ProductosScreenState extends State<ProductosScreen>
     setState(() {});
   }
 
-  Future<void> _abrirCarrito() async {
-    if (!mounted) return;
+ Future<void> _abrirCarrito() async {
+  if (!mounted) return;
 
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CarritoScreen(initialCart: carritoGlobal),
-      ),
-    );
+  final result = await Navigator.push(
+  context,
+  MaterialPageRoute(
+  builder: (_) => CarritoScreen(initialCart: carritoGlobal),
+  ),
+  );
 
-    if (!mounted) return;
-    setState(() {});
+  // 🔹 Actualiza el uid por si se logueó durante el pago
+  final nuevoUid = FirebaseAuth.instance.currentUser?.uid;
+  if (nuevoUid != uid) {
+  uid = nuevoUid;
+
+
+  // 🔹 Reconfigura el listener de favoritos si hay usuario
+  if (uid != null) {
+    FirebaseFirestore.instance
+        .collection("favoritos")
+        .doc(uid)
+        .collection("items")
+        .snapshots()
+        .listen((snap) {
+      favoritosIds = snap.docs.map((d) => d.id).toSet();
+      if (mounted) setState(() {}); // 🔥 Esto recarga los corazones
+    });
   }
+  }
+
+// 🔹 Refresca la UI
+if (!mounted) return;
+setState(() {});
+}
+
+
 
   void _abrirDetalleProducto(Map<String, dynamic> producto) async {
     if (!mounted) return;
@@ -143,6 +177,30 @@ class _ProductosScreenState extends State<ProductosScreen>
     setState(() {});
   }
 
+  void _abrirPerfil() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PerfilScreen()),
+    );
+  }
+
+  // ⭐⭐⭐ AGREGADO: función para manejar favoritos ⭐⭐⭐
+  Future<void> _toggleFavorito(String productId) async {
+    if (uid == null) return; // no logueado
+
+    final ref = FirebaseFirestore.instance
+        .collection("favoritos")
+        .doc(uid)
+        .collection("items")
+        .doc(productId);
+
+    if (favoritosIds.contains(productId)) {
+      await ref.delete();
+    } else {
+      await ref.set({"timestamp": FieldValue.serverTimestamp()});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color turquesa = Colors.teal.shade400;
@@ -150,7 +208,7 @@ class _ProductosScreenState extends State<ProductosScreen>
     return SafeArea(
       child: Column(
         children: [
-          // ✅ Encabezado
+          // ---------- ENCABEZADO ----------
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
@@ -161,36 +219,48 @@ class _ProductosScreenState extends State<ProductosScreen>
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: turquesa)),
-                ScaleTransition(
-                  scale: Tween<double>(begin: 1, end: 1.3).animate(
-                    CurvedAnimation(
-                        parent: _animController, curve: Curves.easeOutBack),
-                  ),
-                  child: GestureDetector(
-                    onTap: _abrirCarrito,
-                    child: badges.Badge(
-                      showBadge: _totalItemsEnCarrito() > 0,
-                      position: badges.BadgePosition.topEnd(top: -10, end: -6),
-                      badgeContent: Text(
-                        _totalItemsEnCarrito().toString(),
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 12),
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _abrirPerfil,
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: turquesa,
+                          child: const Icon(Icons.person, color: Colors.white),
+                        ),
                       ),
-                      badgeStyle: badges.BadgeStyle(
-                        badgeColor: Colors.redAccent,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                      ),
-                      child: Icon(Icons.shopping_cart,
-                          size: 32, color: turquesa),
                     ),
-                  ),
+                    ScaleTransition(
+                      scale: Tween<double>(begin: 1, end: 1.3).animate(
+                        CurvedAnimation(
+                            parent: _animController, curve: Curves.easeOutBack),
+                      ),
+                      child: GestureDetector(
+                        onTap: _abrirCarrito,
+                        child: badges.Badge(
+                          showBadge: _totalItemsEnCarrito() > 0,
+                          position: badges.BadgePosition.topEnd(top: -10, end: -6),
+                          badgeContent: Text(
+                            _totalItemsEnCarrito().toString(),
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                          badgeStyle: badges.BadgeStyle(
+                            badgeColor: Colors.redAccent,
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          ),
+                          child: Icon(Icons.shopping_cart, size: 32, color: turquesa),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
-          // ✅ Buscador
+          // ---------- BUSCADOR ----------
           Padding(
             padding: const EdgeInsets.all(10),
             child: TextField(
@@ -216,7 +286,7 @@ class _ProductosScreenState extends State<ProductosScreen>
             ),
           ),
 
-          // ✅ Lista de Productos
+          // ---------- LISTA ----------
           Expanded(
             child: RefreshIndicator(
               onRefresh: _onRefresh,
@@ -236,8 +306,7 @@ class _ProductosScreenState extends State<ProductosScreen>
                     final nombre = quitarAcentos(
                         (data['Nombre'] ?? '').toString().toLowerCase());
                     final disponible = data['Disponibilidad'] == true ||
-                        data['Disponibilidad'].toString().toLowerCase() ==
-                            'true';
+                        data['Disponibilidad'].toString().toLowerCase() == 'true';
                     return disponible && nombre.startsWith(_searchQuery);
                   }).toList();
 
@@ -248,8 +317,7 @@ class _ProductosScreenState extends State<ProductosScreen>
                     key: const PageStorageKey('grid_productos'),
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       childAspectRatio: 0.7,
                       crossAxisSpacing: 8,
@@ -257,13 +325,12 @@ class _ProductosScreenState extends State<ProductosScreen>
                     ),
                     itemCount: productos.length,
                     itemBuilder: (context, index) {
-                      final data =
-                          productos[index].data() as Map<String, dynamic>;
+                      final data = productos[index].data() as Map<String, dynamic>;
+                      final productoId = productos[index].id;
                       final nombre = data['Nombre'] ?? 'Sin nombre';
-                      final precio =
-                          double.tryParse(data['Precio'].toString()) ?? 0.0;
-                      final imagenUrl =
-                          _formatearEnlaceDrive(data['imagen']);
+                      final precio = double.tryParse(data['Precio'].toString()) ?? 0.0;
+                      final imagenUrl = _formatearEnlaceDrive(data['imagen']);
+                      final productId = data['id']; // 👈 TU ID PROD001, PROD002...
 
                       return GestureDetector(
                         onTap: () => _abrirDetalleProducto(data),
@@ -274,28 +341,24 @@ class _ProductosScreenState extends State<ProductosScreen>
                           child: Stack(
                             children: [
                               Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Expanded(
                                     child: ClipRRect(
-                                      borderRadius:
-                                          const BorderRadius.vertical(
-                                              top: Radius.circular(12)),
+                                      borderRadius: const BorderRadius.vertical(
+                                          top: Radius.circular(12)),
                                       child: imagenUrl.isNotEmpty
                                           ? Image.network(
                                               imagenUrl,
                                               fit: BoxFit.cover,
                                               width: double.infinity,
                                               errorBuilder: (_, __, ___) =>
-                                                  const Icon(Icons.broken_image,
-                                                      size: 80),
+                                                  const Icon(Icons.broken_image, size: 80),
                                             )
                                           : const Icon(Icons.image, size: 80),
                                     ),
                                   ),
 
-                                  // ✅ Nombre con espacio fijo de 2 líneas
                                   Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: SizedBox(
@@ -304,7 +367,6 @@ class _ProductosScreenState extends State<ProductosScreen>
                                         nombre,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.start,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
@@ -329,20 +391,21 @@ class _ProductosScreenState extends State<ProductosScreen>
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
+
+                              // ---------- PRECIO ----------
                               Positioned(
                                 right: 8,
                                 top: 8,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withOpacity(0.6),
                                     borderRadius: BorderRadius.circular(8),
@@ -355,6 +418,73 @@ class _ProductosScreenState extends State<ProductosScreen>
                                   ),
                                 ),
                               ),
+
+                              // ---------- FAVORITO ----------
+                              if (uid != null)
+  Positioned(
+    left: 8,
+    top: 8,
+    child: StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("usuarios")
+          .doc(uid)
+          .collection("favoritos")
+          .doc(productoId)
+          .snapshots(),
+      builder: (context, favSnapshot) {
+        final bool esFavorito =
+            favSnapshot.data != null && favSnapshot.data!.exists;
+
+        return GestureDetector(
+          onTap: () async {
+            if (esFavorito) {
+              // 🗑️ quitar de favoritos
+              await FirebaseFirestore.instance
+                  .collection("usuarios")
+                  .doc(uid)
+                  .collection("favoritos")
+                  .doc(productoId)
+                  .delete();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Eliminado de favoritos"),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            } else {
+              // ❤️ agregar a favoritos
+              await FirebaseFirestore.instance
+                  .collection("usuarios")
+                  .doc(uid)
+                  .collection("favoritos")
+                  .doc(productoId)
+                  .set({
+                "id": productoId,
+                "Nombre": data['Nombre'],
+                "Precio": data['Precio'],
+                "imagen": data['imagen'],
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Agregado a favoritos"),
+                  backgroundColor: Colors.pinkAccent,
+                ),
+              );
+            }
+          },
+          child: Icon(
+            esFavorito ? Icons.favorite : Icons.favorite_border,
+            size: 28,
+            color: Colors.pinkAccent,
+          ),
+        );
+      },
+    ),
+  ),
+
+
                             ],
                           ),
                         ),
