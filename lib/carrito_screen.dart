@@ -16,7 +16,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
   late List<Map<String, dynamic>> _cart;
   bool _processing = false;
   User? _usuario;
-  String? _metodoPagoSeleccionado; // Null inicialmente
+  String? _metodoPagoSeleccionado;
 
   @override
   void initState() {
@@ -92,7 +92,7 @@ class _CarritoScreenState extends State<CarritoScreen> {
         const SnackBar(content: Text("Pedido confirmado 🎉")),
       );
 
-      Navigator.pop(context, "reload"); // Regresa al catálogo
+      Navigator.pop(context, "reload");
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
@@ -129,15 +129,15 @@ class _CarritoScreenState extends State<CarritoScreen> {
   Widget _iconoMetodoPago(String metodo) {
     switch (metodo) {
       case 'Tarjeta de Crédito':
-        return const Icon(Icons.credit_card, color: Colors.teal, size: 32);
+        return const Icon(Icons.credit_card, color: Colors.teal, size: 28);
       case 'Transferencia Bancaria':
-        return const Icon(Icons.account_balance, color: Colors.teal, size: 32);
+        return const Icon(Icons.account_balance, color: Colors.teal, size: 28);
       case 'PayPal':
-        return const Icon(Icons.phone_android, color: Colors.teal, size: 32);
+        return const Icon(Icons.phone_android, color: Colors.teal, size: 28);
       case 'No hay método de pago':
-        return const Icon(Icons.close, color: Colors.red, size: 32);
+        return const Icon(Icons.close, color: Colors.red, size: 28);
       default:
-        return const SizedBox(width: 40, height: 40);
+        return const SizedBox(width: 28, height: 28);
     }
   }
 
@@ -177,79 +177,124 @@ class _CarritoScreenState extends State<CarritoScreen> {
             )
           : Column(
               children: [
+                // ✅ BIENVENIDA CON NOMBRE DEL USUARIO
                 if (_usuario != null)
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        const CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.teal,
-                          child: Icon(Icons.person, color: Colors.white),
+                  FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection('Usuarios')
+                        .doc(_usuario!.uid)
+                        .get(),
+                    builder: (context, snapshot) {
+                      String nombreUsuario = "Usuario";
+                      
+                      if (snapshot.hasData && snapshot.data!.exists) {
+                        final data = snapshot.data!.data() as Map<String, dynamic>?;
+                        nombreUsuario = data?['nombre'] ?? _usuario!.displayName ?? "Usuario";
+                      } else if (_usuario!.displayName != null) {
+                        nombreUsuario = _usuario!.displayName!;
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.shade50,
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            "Bienvenido ${_usuario!.email}",
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.waving_hand,
+                              color: Colors.amber,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "Bienvenido $nombreUsuario",
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
 
-                // Desplegable de método de pago solo si está logueado
+                const SizedBox(height: 8),
+
+                // ✅ CORREGIDO: Método de pago con Row que no se desborda
                 if (_usuario != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Row(
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             value: _metodoPagoSeleccionado,
-                            hint: const Text("Selecciona un método de pago"),
+                            hint: const Text(
+                              "Selecciona un método de pago",
+                              style: TextStyle(fontSize: 14),
+                            ),
                             items: const [
                               DropdownMenuItem(
-                                  value: 'No hay método de pago',
-                                  child: Text('No hay método de pago')),
+                                value: 'No hay método de pago',
+                                child: Text('No hay método de pago'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'Tarjeta de Crédito',
-                                  child: Text('Tarjeta de Crédito')),
+                                value: 'Tarjeta de Crédito',
+                                child: Text('Tarjeta de Crédito'),
+                              ),
                               DropdownMenuItem(
-                                  value: 'Transferencia Bancaria',
-                                  child: Text('Transferencia Bancaria')),
-                              DropdownMenuItem(value: 'PayPal', child: Text('PayPal')),
+                                value: 'Transferencia Bancaria',
+                                child: Text('Transferencia Bancaria'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'PayPal',
+                                child: Text('PayPal'),
+                              ),
                             ],
                             onChanged: (valor) {
                               setState(() => _metodoPagoSeleccionado = valor);
                             },
                             decoration: const InputDecoration(
                               border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                             ),
+                            isExpanded: true,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        _metodoPagoSeleccionado != null
-                            ? _iconoMetodoPago(_metodoPagoSeleccionado!)
-                            : const SizedBox(
-                                width: 40,
-                                height: 40,
-                                child: Center(
-                                  child: Text(
-                                    "Escoge\nMétodo",
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: Colors.grey, fontSize: 10),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 45,
+                          height: 45,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: _metodoPagoSeleccionado != null
+                                ? _iconoMetodoPago(_metodoPagoSeleccionado!)
+                                : const Icon(
+                                    Icons.payment,
+                                    color: Colors.grey,
+                                    size: 24,
                                   ),
-                                ),
-                              ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
+
+                const SizedBox(height: 8),
 
                 Expanded(
                   child: ListView.builder(
@@ -267,7 +312,9 @@ class _CarritoScreenState extends State<CarritoScreen> {
                         elevation: 4,
                         shadowColor: Colors.black26,
                         margin: const EdgeInsets.only(bottom: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
@@ -275,8 +322,12 @@ class _CarritoScreenState extends State<CarritoScreen> {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: imagen.isNotEmpty
-                                    ? Image.network(imagen,
-                                        width: 85, height: 85, fit: BoxFit.cover)
+                                    ? Image.network(
+                                        imagen,
+                                        width: 85,
+                                        height: 85,
+                                        fit: BoxFit.cover,
+                                      )
                                     : Container(
                                         width: 85,
                                         height: 85,
@@ -289,44 +340,63 @@ class _CarritoScreenState extends State<CarritoScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(nombre,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w700, fontSize: 17)),
+                                    Text(
+                                      nombre,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 17,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                     const SizedBox(height: 4),
-                                    Text('S/. ${precio.toStringAsFixed(2)} c/u',
-                                        style: const TextStyle(
-                                            color: Colors.grey, fontSize: 14)),
+                                    Text(
+                                      'S/. ${precio.toStringAsFixed(2)} c/u',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 14,
+                                      ),
+                                    ),
                                     const SizedBox(height: 10),
                                     Row(
                                       children: [
                                         _circleBtn(
-                                            icon: Icons.remove,
-                                            color: Colors.redAccent,
-                                            onTap: () =>
-                                                _actualizarCantidad(i, cantidad - 1)),
+                                          icon: Icons.remove,
+                                          color: Colors.redAccent,
+                                          onTap: () =>
+                                              _actualizarCantidad(i, cantidad - 1),
+                                        ),
                                         Padding(
-                                          padding:
-                                              const EdgeInsets.symmetric(horizontal: 10),
-                                          child: Text('$cantidad',
-                                              style: const TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold)),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10),
+                                          child: Text(
+                                            '$cantidad',
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ),
                                         _circleBtn(
-                                            icon: Icons.add,
-                                            color: Colors.green,
-                                            onTap: () =>
-                                                _actualizarCantidad(i, cantidad + 1)),
+                                          icon: Icons.add,
+                                          color: Colors.green,
+                                          onTap: () =>
+                                              _actualizarCantidad(i, cantidad + 1),
+                                        ),
                                       ],
                                     ),
                                   ],
                                 ),
                               ),
-                              Text('S/. ${total.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 17,
-                                      color: turquesa)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'S/. ${total.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 17,
+                                  color: turquesa,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -337,12 +407,14 @@ class _CarritoScreenState extends State<CarritoScreen> {
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(18)),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 8,
-                          offset: const Offset(0, -3)),
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, -3),
+                      ),
                     ],
                   ),
                   padding: const EdgeInsets.all(20),
@@ -356,14 +428,21 @@ class _CarritoScreenState extends State<CarritoScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text("TOTAL",
-                              style: TextStyle(
-                                  fontSize: 23, fontWeight: FontWeight.w800)),
-                          Text("S/. ${_calcularTotal().toStringAsFixed(2)}",
-                              style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w900,
-                                  color: turquesa)),
+                          const Text(
+                            "TOTAL",
+                            style: TextStyle(
+                              fontSize: 23,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            "S/. ${_calcularTotal().toStringAsFixed(2)}",
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: turquesa,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 22),
@@ -375,16 +454,21 @@ class _CarritoScreenState extends State<CarritoScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: turquesa,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             elevation: 4,
                           ),
                           child: _processing
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text("Confirmar Pedido",
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white)
+                              : const Text(
+                                  "Confirmar Pedido",
                                   style: TextStyle(
-                                      fontSize: 19,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white)),
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ),
                     ],
@@ -399,21 +483,38 @@ class _CarritoScreenState extends State<CarritoScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
-        Text("S/. ${value.toStringAsFixed(2)}",
-            style: const TextStyle(
-                fontSize: 17, fontWeight: FontWeight.w600, color: Colors.black87)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
+        ),
+        Text(
+          "S/. ${value.toStringAsFixed(2)}",
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _circleBtn(
-      {required IconData icon, required Color color, required VoidCallback onTap}) {
+  Widget _circleBtn({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          )
+        ],
       ),
       child: InkWell(
         onTap: onTap,

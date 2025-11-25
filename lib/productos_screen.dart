@@ -17,8 +17,8 @@ class _ProductosScreenState extends State<ProductosScreen>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
-  String? uid; // 👈 AGREGADO: saber si hay usuario
-  Set<String> favoritosIds = {}; // 👈 AGREGADO: IDs favoritos guardados
+  String? uid;
+  Set<String> favoritosIds = {};
 
   String quitarAcentos(String texto) {
     const acentos = {
@@ -35,9 +35,8 @@ class _ProductosScreenState extends State<ProductosScreen>
   void initState() {
     super.initState();
 
-    uid = FirebaseAuth.instance.currentUser?.uid; // 👈 AGREGADO
+    uid = FirebaseAuth.instance.currentUser?.uid;
 
-    // 👇 AGREGADO: escuchar favoritos en tiempo real
     if (uid != null) {
       FirebaseFirestore.instance
           .collection("Favoritos")
@@ -126,42 +125,36 @@ class _ProductosScreenState extends State<ProductosScreen>
     setState(() {});
   }
 
- Future<void> _abrirCarrito() async {
-  if (!mounted) return;
+  Future<void> _abrirCarrito() async {
+    if (!mounted) return;
 
-  final result = await Navigator.push(
-  context,
-  MaterialPageRoute(
-  builder: (_) => CarritoScreen(initialCart: carritoGlobal),
-  ),
-  );
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CarritoScreen(initialCart: carritoGlobal),
+      ),
+    );
 
-  // 🔹 Actualiza el uid por si se logueó durante el pago
-  final nuevoUid = FirebaseAuth.instance.currentUser?.uid;
-  if (nuevoUid != uid) {
-  uid = nuevoUid;
+    final nuevoUid = FirebaseAuth.instance.currentUser?.uid;
+    if (nuevoUid != uid) {
+      uid = nuevoUid;
 
+      if (uid != null) {
+        FirebaseFirestore.instance
+            .collection("Favoritos")
+            .doc(uid)
+            .collection("items")
+            .snapshots()
+            .listen((snap) {
+          favoritosIds = snap.docs.map((d) => d.id).toSet();
+          if (mounted) setState(() {});
+        });
+      }
+    }
 
-  // 🔹 Reconfigura el listener de favoritos si hay usuario
-  if (uid != null) {
-    FirebaseFirestore.instance
-        .collection("Favoritos")
-        .doc(uid)
-        .collection("items")
-        .snapshots()
-        .listen((snap) {
-      favoritosIds = snap.docs.map((d) => d.id).toSet();
-      if (mounted) setState(() {}); // 🔥 Esto recarga los corazones
-    });
+    if (!mounted) return;
+    setState(() {});
   }
-  }
-
-// 🔹 Refresca la UI
-if (!mounted) return;
-setState(() {});
-}
-
-
 
   void _abrirDetalleProducto(Map<String, dynamic> producto) async {
     if (!mounted) return;
@@ -177,16 +170,8 @@ setState(() {});
     setState(() {});
   }
 
-  void _abrirPerfil() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PerfilScreen()),
-    );
-  }
-
-  // ⭐⭐⭐ AGREGADO: función para manejar favoritos ⭐⭐⭐
   Future<void> _toggleFavorito(String productId) async {
-    if (uid == null) return; // no logueado
+    if (uid == null) return;
 
     final ref = FirebaseFirestore.instance
         .collection("Favoritos")
@@ -208,59 +193,57 @@ setState(() {});
     return SafeArea(
       child: Column(
         children: [
-          // ---------- ENCABEZADO ----------
+          // ✅ ENCABEZADO - SIN ÍCONO DE USUARIO
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Catálogo",
-                    style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: turquesa)),
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: _abrirPerfil,
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 12),
-                        child: CircleAvatar(
-                          radius: 18,
-                          backgroundColor: turquesa,
-                          child: const Icon(Icons.person, color: Colors.white),
+                Text(
+                  "Catálogo",
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: turquesa,
+                  ),
+                ),
+                // ✅ SOLO EL CARRITO
+                ScaleTransition(
+                  scale: Tween<double>(begin: 1, end: 1.3).animate(
+                    CurvedAnimation(
+                      parent: _animController,
+                      curve: Curves.easeOutBack,
+                    ),
+                  ),
+                  child: GestureDetector(
+                    onTap: _abrirCarrito,
+                    child: badges.Badge(
+                      showBadge: _totalItemsEnCarrito() > 0,
+                      position: badges.BadgePosition.topEnd(top: -10, end: -6),
+                      badgeContent: Text(
+                        _totalItemsEnCarrito().toString(),
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                      badgeStyle: badges.BadgeStyle(
+                        badgeColor: Colors.redAccent,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
                         ),
                       ),
-                    ),
-                    ScaleTransition(
-                      scale: Tween<double>(begin: 1, end: 1.3).animate(
-                        CurvedAnimation(
-                            parent: _animController, curve: Curves.easeOutBack),
-                      ),
-                      child: GestureDetector(
-                        onTap: _abrirCarrito,
-                        child: badges.Badge(
-                          showBadge: _totalItemsEnCarrito() > 0,
-                          position: badges.BadgePosition.topEnd(top: -10, end: -6),
-                          badgeContent: Text(
-                            _totalItemsEnCarrito().toString(),
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                          badgeStyle: badges.BadgeStyle(
-                            badgeColor: Colors.redAccent,
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                          ),
-                          child: Icon(Icons.shopping_cart, size: 32, color: turquesa),
-                        ),
+                      child: Icon(
+                        Icons.shopping_cart,
+                        size: 32,
+                        color: turquesa,
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
 
-          // ---------- BUSCADOR ----------
+          // BUSCADOR
           Padding(
             padding: const EdgeInsets.all(10),
             child: TextField(
@@ -286,7 +269,7 @@ setState(() {});
             ),
           ),
 
-          // ---------- LISTA ----------
+          // LISTA DE PRODUCTOS
           Expanded(
             child: RefreshIndicator(
               onRefresh: _onRefresh,
@@ -330,14 +313,14 @@ setState(() {});
                       final nombre = data['Nombre'] ?? 'Sin nombre';
                       final precio = double.tryParse(data['Precio'].toString()) ?? 0.0;
                       final imagenUrl = _formatearEnlaceDrive(data['imagen']);
-                      final productId = data['id']; // 👈 TU ID PROD001, PROD002...
 
                       return GestureDetector(
                         onTap: () => _abrirDetalleProducto(data),
                         child: Card(
                           elevation: 3,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           child: Stack(
                             children: [
                               Column(
@@ -346,19 +329,22 @@ setState(() {});
                                   Expanded(
                                     child: ClipRRect(
                                       borderRadius: const BorderRadius.vertical(
-                                          top: Radius.circular(12)),
+                                        top: Radius.circular(12),
+                                      ),
                                       child: imagenUrl.isNotEmpty
                                           ? Image.network(
                                               imagenUrl,
                                               fit: BoxFit.cover,
                                               width: double.infinity,
                                               errorBuilder: (_, __, ___) =>
-                                                  const Icon(Icons.broken_image, size: 80),
+                                                  const Icon(
+                                                Icons.broken_image,
+                                                size: 80,
+                                              ),
                                             )
                                           : const Icon(Icons.image, size: 80),
                                     ),
                                   ),
-
                                   Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: SizedBox(
@@ -374,19 +360,24 @@ setState(() {});
                                       ),
                                     ),
                                   ),
-
                                   Padding(
                                     padding: const EdgeInsets.only(
-                                        left: 8, right: 8, bottom: 6),
+                                      left: 8,
+                                      right: 8,
+                                      bottom: 6,
+                                    ),
                                     child: ElevatedButton.icon(
                                       onPressed: () => _agregarAlCarrito(data),
-                                      icon: const Icon(Icons.add_shopping_cart,
-                                          color: Colors.white),
+                                      icon: const Icon(
+                                        Icons.add_shopping_cart,
+                                        color: Colors.white,
+                                      ),
                                       label: const Text(
                                         "Agregar",
                                         style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold),
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal,
@@ -399,13 +390,15 @@ setState(() {});
                                 ],
                               ),
 
-                              // ---------- PRECIO ----------
+                              // PRECIO
                               Positioned(
                                 right: 8,
                                 top: 8,
                                 child: Container(
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.black.withOpacity(0.6),
                                     borderRadius: BorderRadius.circular(8),
@@ -413,78 +406,83 @@ setState(() {});
                                   child: Text(
                                     'S/. ${precio.toStringAsFixed(2)}',
                                     style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold),
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
 
-                              // ---------- FAVORITO ----------
+                              // FAVORITO
                               if (uid != null)
-  Positioned(
-    left: 8,
-    top: 8,
-    child: StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection("Usuarios")
-          .doc(uid)
-          .collection("Favoritos")
-          .doc(productoId)
-          .snapshots(),
-      builder: (context, favSnapshot) {
-        final bool esFavorito =
-            favSnapshot.data != null && favSnapshot.data!.exists;
+                                Positioned(
+                                  left: 8,
+                                  top: 8,
+                                  child: StreamBuilder<DocumentSnapshot>(
+                                    stream: FirebaseFirestore.instance
+                                        .collection("Usuarios")
+                                        .doc(uid)
+                                        .collection("Favoritos")
+                                        .doc(productoId)
+                                        .snapshots(),
+                                    builder: (context, favSnapshot) {
+                                      final bool esFavorito = favSnapshot.data !=
+                                              null &&
+                                          favSnapshot.data!.exists;
 
-        return GestureDetector(
-          onTap: () async {
-            if (esFavorito) {
-              // 🗑️ quitar de favoritos
-              await FirebaseFirestore.instance
-                  .collection("Usuarios")
-                  .doc(uid)
-                  .collection("Favoritos")
-                  .doc(productoId)
-                  .delete();
+                                      return GestureDetector(
+                                        onTap: () async {
+                                          if (esFavorito) {
+                                            await FirebaseFirestore.instance
+                                                .collection("Usuarios")
+                                                .doc(uid)
+                                                .collection("Favoritos")
+                                                .doc(productoId)
+                                                .delete();
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Eliminado de favoritos"),
-                  backgroundColor: Colors.redAccent,
-                ),
-              );
-            } else {
-              // ❤️ agregar a favoritos
-              await FirebaseFirestore.instance
-                  .collection("Usuarios")
-                  .doc(uid)
-                  .collection("Favoritos")
-                  .doc(productoId)
-                  .set({
-                "id": productoId,
-                "Nombre": data['Nombre'],
-                "Precio": data['Precio'],
-                "imagen": data['imagen'],
-              });
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    "Eliminado de favoritos"),
+                                                backgroundColor: Colors.redAccent,
+                                              ),
+                                            );
+                                          } else {
+                                            await FirebaseFirestore.instance
+                                                .collection("Usuarios")
+                                                .doc(uid)
+                                                .collection("Favoritos")
+                                                .doc(productoId)
+                                                .set({
+                                              "id": productoId,
+                                              "Nombre": data['Nombre'],
+                                              "Precio": data['Precio'],
+                                              "imagen": data['imagen'],
+                                            });
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Agregado a favoritos"),
-                  backgroundColor: Colors.pinkAccent,
-                ),
-              );
-            }
-          },
-          child: Icon(
-            esFavorito ? Icons.favorite : Icons.favorite_border,
-            size: 28,
-            color: Colors.pinkAccent,
-          ),
-        );
-      },
-    ),
-  ),
-
-
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    "Agregado a favoritos"),
+                                                backgroundColor:
+                                                    Colors.pinkAccent,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        child: Icon(
+                                          esFavorito
+                                              ? Icons.favorite
+                                              : Icons.favorite_border,
+                                          size: 28,
+                                          color: Colors.pinkAccent,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                             ],
                           ),
                         ),
