@@ -40,7 +40,7 @@ class _ProductosScreenState extends State<ProductosScreen>
     // 👇 AGREGADO: escuchar favoritos en tiempo real
     if (uid != null) {
       FirebaseFirestore.instance
-          .collection("favoritos")
+          .collection("Favoritos")
           .doc(uid)
           .collection("items")
           .snapshots()
@@ -145,7 +145,7 @@ class _ProductosScreenState extends State<ProductosScreen>
   // 🔹 Reconfigura el listener de favoritos si hay usuario
   if (uid != null) {
     FirebaseFirestore.instance
-        .collection("favoritos")
+        .collection("Favoritos")
         .doc(uid)
         .collection("items")
         .snapshots()
@@ -189,7 +189,7 @@ setState(() {});
     if (uid == null) return; // no logueado
 
     final ref = FirebaseFirestore.instance
-        .collection("favoritos")
+        .collection("Favoritos")
         .doc(uid)
         .collection("items")
         .doc(productId);
@@ -426,9 +426,9 @@ setState(() {});
     top: 8,
     child: StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
-          .collection("usuarios")
+          .collection("Usuarios")
           .doc(uid)
-          .collection("favoritos")
+          .collection("Favoritos")
           .doc(productoId)
           .snapshots(),
       builder: (context, favSnapshot) {
@@ -440,9 +440,9 @@ setState(() {});
             if (esFavorito) {
               // 🗑️ quitar de favoritos
               await FirebaseFirestore.instance
-                  .collection("usuarios")
+                  .collection("Usuarios")
                   .doc(uid)
-                  .collection("favoritos")
+                  .collection("Favoritos")
                   .doc(productoId)
                   .delete();
 
@@ -455,9 +455,9 @@ setState(() {});
             } else {
               // ❤️ agregar a favoritos
               await FirebaseFirestore.instance
-                  .collection("usuarios")
+                  .collection("Usuarios")
                   .doc(uid)
-                  .collection("favoritos")
+                  .collection("Favoritos")
                   .doc(productoId)
                   .set({
                 "id": productoId,

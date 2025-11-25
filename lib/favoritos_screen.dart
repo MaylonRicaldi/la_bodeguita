@@ -45,9 +45,9 @@ class FavoritosScreen extends StatelessWidget {
             )
           : StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection("usuarios")
+                  .collection("Usuarios")
                   .doc(uid)
-                  .collection("favoritos")
+                  .collection("Favoritos")
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
@@ -146,9 +146,9 @@ class FavoritosScreen extends StatelessWidget {
                               GestureDetector(
                                 onTap: () {
                                   FirebaseFirestore.instance
-                                      .collection("usuarios")
+                                      .collection("Usuarios")
                                       .doc(uid)
-                                      .collection("favoritos")
+                                      .collection("Favoritos")
                                       .doc(productId)
                                       .delete();
                                 },

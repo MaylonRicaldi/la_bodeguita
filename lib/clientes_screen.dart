@@ -1,9 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'auth_screen.dart';
 import 'historial_pedidos_screen.dart';
-import 'favoritos_screen.dart'; // <-- IMPORTA TU NUEVA PANTALLA
+import 'favoritos_screen.dart';
 
 class ClientesScreen extends StatefulWidget {
   final Map<String, dynamic>? usuarioData;
@@ -17,6 +20,8 @@ class ClientesScreen extends StatefulWidget {
 class _ClientesScreenState extends State<ClientesScreen> {
   Map<String, dynamic> usuario = {};
   bool _cargando = true;
+  String? fotoBase64;
+  bool cargandoFoto = false;
 
   @override
   void initState() {
@@ -31,6 +36,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
     if (user == null) {
       setState(() {
         usuario = {};
+        fotoBase64 = null;
         _cargando = false;
       });
       return;
@@ -43,8 +49,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
           .get();
 
       if (snap.exists) {
+        final data = snap.data()!;
         setState(() {
-          usuario = snap.data()!;
+          usuario = data;
+          fotoBase64 = data['fotoBase64'];
           _cargando = false;
         });
       } else {
@@ -54,6 +62,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
             "email": user.email ?? "",
             "uid": user.uid,
           };
+          fotoBase64 = null;
           _cargando = false;
         });
       }
@@ -64,9 +73,81 @@ class _ClientesScreenState extends State<ClientesScreen> {
           "email": user?.email ?? "",
           "uid": user?.uid ?? "",
         };
+        fotoBase64 = null;
         _cargando = false;
       });
     }
+  }
+
+  Future<void> seleccionarImagen(bool desdeCamara) async {
+    final picker = ImagePicker();
+
+    final XFile? img = await picker.pickImage(
+      source: desdeCamara ? ImageSource.camera : ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 600,
+    );
+
+    if (img == null) return;
+
+    setState(() => cargandoFoto = true);
+
+    try {
+      final bytes = await File(img.path).readAsBytes();
+      final base64String = base64Encode(bytes);
+
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+
+      await FirebaseFirestore.instance
+          .collection("Usuarios")
+          .doc(uid)
+          .update({"fotoBase64": base64String});
+
+      setState(() {
+        fotoBase64 = base64String;
+        cargandoFoto = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Foto de perfil actualizada")),
+      );
+    } catch (e) {
+      setState(() => cargandoFoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error al actualizar foto")),
+      );
+    }
+  }
+
+  void mostrarOpcionesFoto() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.teal),
+              title: const Text("Tomar foto"),
+              onTap: () {
+                Navigator.pop(context);
+                seleccionarImagen(true);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.teal),
+              title: const Text("Elegir de galería"),
+              onTap: () {
+                Navigator.pop(context);
+                seleccionarImagen(false);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _cerrarSesion() async {
@@ -129,15 +210,56 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   ),
                   child: Column(
                     children: [
-                      const CircleAvatar(
-                        radius: 45,
-                        backgroundColor: Colors.teal,
-                        child: Icon(Icons.person, size: 60, color: Colors.white),
+                      GestureDetector(
+                        onTap: userLogueado ? mostrarOpcionesFoto : null,
+                        child: Stack(
+                          children: [
+                            cargandoFoto
+                                ? const CircleAvatar(
+                                    radius: 45,
+                                    backgroundColor: Colors.teal,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : CircleAvatar(
+                                    radius: 45,
+                                    backgroundColor: Colors.teal,
+                                    backgroundImage: fotoBase64 != null
+                                        ? MemoryImage(base64Decode(fotoBase64!))
+                                        : null,
+                                    child: fotoBase64 == null
+                                        ? const Icon(Icons.person,
+                                            size: 60, color: Colors.white)
+                                        : null,
+                                  ),
+                            if (userLogueado && !cargandoFoto)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.teal,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Text(
                         nombre,
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 5),
                       Text(
@@ -157,7 +279,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const HistorialPedidosScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const HistorialPedidosScreen()),
                     );
                   },
                 ),
@@ -169,7 +292,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const FavoritosScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const FavoritosScreen()),
                     );
                   },
                 ),
