@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,17 +18,50 @@ class ClientesScreen extends StatefulWidget {
   State<ClientesScreen> createState() => _ClientesScreenState();
 }
 
-class _ClientesScreenState extends State<ClientesScreen> {
+class _ClientesScreenState extends State<ClientesScreen> with TickerProviderStateMixin {
   Map<String, dynamic> usuario = {};
   bool _cargando = true;
   String? fotoBase64;
   bool cargandoFoto = false;
+  
+  // Para la animación Polaroid
+  bool _mostrarPolaroid = false;
+  String? _fotoPolaroid;
+  late AnimationController _polaroidController;
+  late Animation<double> _slideAnimation;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     usuario = widget.usuarioData ?? {};
     _cargarUsuarioFirebase();
+    
+    // Configurar animación Polaroid
+    _polaroidController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    
+    _slideAnimation = Tween<double>(begin: 1.5, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _polaroidController,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+      ),
+    );
+    
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _polaroidController,
+        curve: const Interval(0.3, 0.8, curve: Curves.easeIn),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _polaroidController.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarUsuarioFirebase() async {
@@ -79,6 +113,35 @@ class _ClientesScreenState extends State<ClientesScreen> {
     }
   }
 
+  Future<void> _efectoFlash() async {
+    // Efecto de flash blanco
+    showDialog(
+      context: context,
+      barrierColor: Colors.white,
+      barrierDismissible: false,
+      builder: (_) => const SizedBox.shrink(),
+    );
+    
+    await Future.delayed(const Duration(milliseconds: 150));
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  Future<void> _mostrarAnimacionPolaroid(String base64Image) async {
+    setState(() {
+      _fotoPolaroid = base64Image;
+      _mostrarPolaroid = true;
+    });
+    
+    _polaroidController.forward(from: 0.0);
+    
+    await Future.delayed(const Duration(milliseconds: 2500));
+    
+    if (mounted) {
+      setState(() => _mostrarPolaroid = false);
+      _polaroidController.reset();
+    }
+  }
+
   Future<void> seleccionarImagen(bool desdeCamara) async {
     final picker = ImagePicker();
 
@@ -89,6 +152,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
 
     if (img == null) return;
+
+    // Vibración y flash
+    HapticFeedback.mediumImpact();
+    await _efectoFlash();
 
     setState(() => cargandoFoto = true);
 
@@ -108,8 +175,11 @@ class _ClientesScreenState extends State<ClientesScreen> {
         cargandoFoto = false;
       });
 
+      // ✨ ANIMACIÓN POLAROID
+      await _mostrarAnimacionPolaroid(base64String);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Foto de perfil actualizada")),
+        const SnackBar(content: Text("¡Foto de perfil actualizada! 📸")),
       );
     } catch (e) {
       setState(() => cargandoFoto = false);
@@ -122,6 +192,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
   void mostrarOpcionesFoto() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -129,16 +200,16 @@ class _ClientesScreenState extends State<ClientesScreen> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.teal),
-              title: const Text("Tomar foto"),
+              leading: const Icon(Icons.camera_alt, color: Colors.tealAccent),
+              title: const Text("Tomar foto", style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 seleccionarImagen(true);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.teal),
-              title: const Text("Elegir de galería"),
+              leading: const Icon(Icons.photo_library, color: Colors.tealAccent),
+              title: const Text("Elegir de galería", style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 seleccionarImagen(false);
@@ -307,6 +378,66 @@ class _ClientesScreenState extends State<ClientesScreen> {
               child: const Center(
                 child: CircularProgressIndicator(color: Colors.teal),
               ),
+            ),
+
+          // ✨ ANIMACIÓN POLAROID
+          if (_mostrarPolaroid && _fotoPolaroid != null)
+            AnimatedBuilder(
+              animation: _polaroidController,
+              builder: (context, child) {
+                return Positioned(
+                  bottom: MediaQuery.of(context).size.height * _slideAnimation.value,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Opacity(
+                      opacity: _fadeAnimation.value,
+                      child: Transform.rotate(
+                        angle: -0.05,
+                        child: Container(
+                          width: 200,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 20,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.memory(
+                                  base64Decode(_fotoPolaroid!),
+                                  width: 170,
+                                  height: 170,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                "¡Foto guardada! 📸",
+                                style: TextStyle(
+                                  fontFamily: 'Courier',
+                                  fontSize: 14,
+                                  color: Colors.grey[800],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
         ],
       ),
