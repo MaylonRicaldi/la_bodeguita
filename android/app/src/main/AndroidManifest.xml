@@ -10,7 +10,7 @@ xmlns:tools="http://schemas.android.com/tools">
     
 
     <application
-        android:label="la_bodeguita"
+        android:label="La Bodeguita"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
