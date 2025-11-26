@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'carrito_screen.dart';
 
 class HistorialPedidosScreen extends StatelessWidget {
   const HistorialPedidosScreen({Key? key}) : super(key: key);
@@ -19,9 +20,8 @@ class HistorialPedidosScreen extends StatelessWidget {
         return snap.data()!['nombre'] ?? "Usuario";
       }
 
-      // Si no hay nombre en Firestore, usar el displayName de Firebase Auth
       return FirebaseAuth.instance.currentUser?.displayName ?? "Usuario";
-    } catch (e) {
+    } catch (_) {
       return "Usuario";
     }
   }
@@ -60,34 +60,30 @@ class HistorialPedidosScreen extends StatelessWidget {
                       .orderBy('fecha', descending: true)
                       .snapshots(),
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                    if (!snapshot.hasData) {
                       return const Center(
                         child: CircularProgressIndicator(color: Colors.teal),
                       );
                     }
 
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    if (snapshot.data!.docs.isEmpty) {
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.shopping_bag_outlined,
-                              size: 80,
-                              color: Colors.grey,
-                            ),
+                            const Icon(Icons.shopping_bag_outlined,
+                                size: 80, color: Colors.grey),
                             const SizedBox(height: 16),
                             Text(
                               "Hola $nombreUsuario 👋",
                               style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  fontSize: 20, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 8),
                             const Text(
                               "No tienes pedidos aún 🛒",
-                              style: TextStyle(fontSize: 16, color: Colors.grey),
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -200,7 +196,9 @@ class HistorialPedidosScreen extends StatelessWidget {
     );
   }
 
-  // ====================== DETALLE DEL PEDIDO MEJORADO ======================
+  // ===========================================================
+  // =============== DETALLE DEL PEDIDO ========================
+  // ===========================================================
 
   void _mostrarDetallePedido(
       BuildContext context, Map<String, dynamic> pedido, int numeroPedido) {
@@ -209,7 +207,6 @@ class HistorialPedidosScreen extends StatelessWidget {
     final subtotal = pedido['subtotal'] ?? 0.0;
     final igv = pedido['igv'] ?? 0.0;
     final fecha = (pedido['fecha'] as Timestamp?)?.toDate();
-    final direccion = pedido['direccion'] ?? "Por definir";
     final metodoPago = pedido['metodoPago'] ?? "Efectivo";
     final estado = pedido['estado'] ?? "Pendiente";
 
@@ -230,7 +227,6 @@ class HistorialPedidosScreen extends StatelessWidget {
           child: ListView(
             controller: controller,
             children: [
-              // Handle superior
               Center(
                 child: Container(
                   width: 55,
@@ -243,7 +239,6 @@ class HistorialPedidosScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Título
               Row(
                 children: [
                   Container(
@@ -252,11 +247,8 @@ class HistorialPedidosScreen extends StatelessWidget {
                       color: Colors.teal.shade50,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.receipt_long,
-                      color: Colors.teal,
-                      size: 28,
-                    ),
+                    child: const Icon(Icons.receipt_long,
+                        color: Colors.teal, size: 28),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -287,24 +279,17 @@ class HistorialPedidosScreen extends StatelessWidget {
 
               const Divider(height: 30),
 
-              // Información del pedido (SIN DIRECCIÓN)
               _seccionInfo("💳 Método de pago", metodoPago),
               const SizedBox(height: 12),
-              _seccionInfo(
-                "📊 Estado",
-                estado,
-                colorTexto: _obtenerColorEstado(estado),
-              ),
+              _seccionInfo("📊 Estado", estado,
+                  colorTexto: _obtenerColorEstado(estado)),
 
               const Divider(height: 30),
 
-              // Productos
               const Text(
                 "🛍️ Productos",
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                    fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
 
@@ -339,7 +324,8 @@ class HistorialPedidosScreen extends StatelessWidget {
                                 width: 60,
                                 height: 60,
                                 color: Colors.teal.shade50,
-                                child: const Icon(Icons.image_not_supported,
+                                child: const Icon(
+                                    Icons.image_not_supported,
                                     color: Colors.teal),
                               ),
                       ),
@@ -359,9 +345,7 @@ class HistorialPedidosScreen extends StatelessWidget {
                             Text(
                               "Cantidad: ${p['cantidad']}",
                               style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 13,
-                              ),
+                                  color: Colors.grey.shade600, fontSize: 13),
                             ),
                           ],
                         ),
@@ -381,7 +365,6 @@ class HistorialPedidosScreen extends StatelessWidget {
 
               const Divider(height: 30),
 
-              // Total desglosado
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -402,7 +385,39 @@ class HistorialPedidosScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // Botón cerrar
+              // ======================================================
+              // BOTÓN VOLVER A PEDIR (MISMO COLOR QUE CERRAR - TEAL)
+              // ======================================================
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal, // MISMO COLOR
+                  minimumSize: const Size(double.infinity, 52),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _volverAPedir(context, pedido);
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CarritoScreen(initialCart: []),
+                    ),
+                  );
+                },
+                child: const Text(
+                  "Volver a pedir",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.teal,
@@ -420,6 +435,7 @@ class HistorialPedidosScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
               const SizedBox(height: 10),
             ],
           ),
@@ -427,6 +443,60 @@ class HistorialPedidosScreen extends StatelessWidget {
       ),
     );
   }
+
+  // ===========================================================
+  // FUNCIÓN VOLVER A PEDIR
+  // ===========================================================
+
+  Future<void> _volverAPedir(
+      BuildContext context, Map<String, dynamic> pedido) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      final carritoRef = FirebaseFirestore.instance
+          .collection('Usuarios')
+          .doc(uid)
+          .collection('Carrito');
+
+      final productos = pedido['productos'] as List<dynamic>;
+
+      final items = await carritoRef.get();
+      for (var item in items.docs) {
+        await item.reference.delete();
+      }
+
+      for (var p in productos) {
+        await carritoRef.add({
+          'nombre': p['nombre'],
+          'precio': p['precio'],
+          'cantidad': p['cantidad'],
+          'imagen': p['imagen'],
+          'productoId': p['id'],
+        });
+      }
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Productos añadidos al carrito"),
+          backgroundColor: Colors.teal,
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Error al volver a pedir"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ===========================================================
 
   Widget _seccionInfo(String titulo, String valor, {Color? colorTexto}) {
     return Container(
@@ -442,9 +512,7 @@ class HistorialPedidosScreen extends StatelessWidget {
             child: Text(
               titulo,
               style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
+                  fontSize: 15, fontWeight: FontWeight.w500),
             ),
           ),
           Flexible(

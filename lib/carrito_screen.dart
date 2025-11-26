@@ -23,19 +23,44 @@ class _CarritoScreenState extends State<CarritoScreen> {
     super.initState();
     _cart = List.from(widget.initialCart);
     _usuario = FirebaseAuth.instance.currentUser;
+
+     _loadCartFromFirestore(); 
   }
 
-  void _actualizarCantidad(int index, int nuevaCantidad) {
+  void _actualizarCantidad(int index, int nuevaCantidad) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (uid == null) return;
+
     setState(() {
       if (nuevaCantidad <= 0) {
+        FirebaseFirestore.instance
+            .collection("Usuarios")
+            .doc(uid)
+            .collection("Carrito")
+            .doc(_cart[index]["id"])
+            .delete();
+
         _cart.removeAt(index);
       } else {
         _cart[index]['cantidad'] = nuevaCantidad;
         _cart[index]['total'] = nuevaCantidad * (_cart[index]['precio'] ?? 0.0);
+
+        FirebaseFirestore.instance
+            .collection("Usuarios")
+            .doc(uid)
+            .collection("Carrito")
+            .doc(_cart[index]["id"])
+            .update({
+          "cantidad": nuevaCantidad,
+          "total": _cart[index]["total"],
+        });
       }
+
       carritoGlobal = List.from(_cart);
     });
   }
+
 
   double _calcularTotal() => _cart.fold(0.0, (sum, item) => sum + (item['total'] ?? 0.0));
   double _calcularIgv() => _calcularTotal() * 0.18;
@@ -47,6 +72,39 @@ class _CarritoScreenState extends State<CarritoScreen> {
       carritoGlobal.clear();
     });
   }
+
+    Future<void> _loadCartFromFirestore() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection("Usuarios")
+        .doc(uid)
+        .collection("Carrito")
+        .get();
+
+
+    if (_cart.isNotEmpty) return;
+
+
+    setState(() {
+      _cart = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          "id": doc.id,
+          "nombre": data["nombre"],
+          "precio": data["precio"],
+          "cantidad": data["cantidad"],
+          "total": (data["precio"] ?? 0.0) * (data["cantidad"] ?? 1),
+          "imagen": data["imagen"],
+        };
+      }).toList();
+
+    });
+
+    carritoGlobal = List.from(_cart);
+  }
+
 
   Future<void> _confirmarPago() async {
     if (_usuario == null) return;
